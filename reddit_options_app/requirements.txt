@@ -1,0 +1,55 @@
+# Core dependencies
+streamlit
+pandas
+numpy
+requests
+plotly
+streamlit
+
+# Reddit & APIs
+praw
+yfinance
+alpha-vantage
+
+# NLP & Sentiment Analysis
+nltk
+vaderSentiment
+textblob
+transformers
+torch
+
+# Machine Learning
+scikit-learn
+xgboost
+lightgbm
+
+# Database - Firebase
+firebase-admin
+google-cloud-firestore
+
+# Options & Finance
+quantlib
+scipy
+
+
+# LLM Integration
+openai
+requests  # For XAI API calls
+
+# Visualization
+plotly
+matplotlib
+seaborn
+
+# Utilities
+python-dotenv
+schedule
+tqdm
+loguru
+
+# Development
+pytest
+black
+flake8
+jupyter
+ipykernel
