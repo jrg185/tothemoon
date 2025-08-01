@@ -1,6 +1,5 @@
 """
-Trading-Focused WSB Sentiment Dashboard
-Fixed version with post listings and better error handling
+Optimized Trading Dashboard with reduced Firebase API calls
 """
 
 import sys
@@ -18,7 +17,10 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timezone, timedelta
 import time
 import requests
-from data.firebase_manager import FirebaseManager
+from typing import Dict, List, Optional
+
+# Use optimized Firebase manager
+from data.firebase_manager import OptimizedFirebaseManager as FirebaseManager
 from config.settings import APP_CONFIG, FINANCIAL_APIS
 import numpy as np
 
@@ -30,7 +32,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Trading-focused CSS
+# Trading-focused CSS (same as before)
 st.markdown("""
 <style>
     .main-header {
@@ -92,20 +94,48 @@ st.markdown("""
         border-radius: 0.3rem;
         border-left: 3px solid #FF4B4B;
     }
+    
+    .cache-info {
+        background-color: #0E1117;
+        padding: 8px;
+        border-radius: 4px;
+        border-left: 3px solid #4CAF50;
+        font-size: 0.8em;
+        color: #888;
+        margin: 5px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 
-class TradingDashboard:
-    """Trading-focused dashboard for actionable opportunities"""
+class OptimizedTradingDashboard:
+    """Optimized trading dashboard with reduced API calls"""
 
     def __init__(self):
         self.firebase_manager = FirebaseManager()
         self.alpha_vantage_key = FINANCIAL_APIS.get('alpha_vantage')
         self.finnhub_key = FINANCIAL_APIS.get('finnhub')
 
+        # Rate limiting for price API calls
+        self.price_cache = {}
+        self.price_cache_duration = 300  # 5 minutes
+        self.last_price_requests = {}
+
     def get_stock_price_data(self, ticker: str) -> dict:
-        """Get current price and basic metrics for a ticker with better error handling"""
+        """Get current price data with caching and rate limiting"""
+        # Check cache first
+        cache_key = ticker.upper()
+        current_time = time.time()
+
+        if (cache_key in self.price_cache and
+            current_time - self.price_cache[cache_key]['timestamp'] < self.price_cache_duration):
+            return self.price_cache[cache_key]['data']
+
+        # Rate limiting - max 1 request per ticker per 30 seconds
+        if (cache_key in self.last_price_requests and
+            current_time - self.last_price_requests[cache_key] < 30):
+            return self._get_default_price_data()
+
         try:
             if not self.finnhub_key:
                 return self._get_default_price_data()
@@ -116,7 +146,7 @@ class TradingDashboard:
 
             if response.status_code == 200:
                 data = response.json()
-                return {
+                price_data = {
                     'current_price': data.get('c') or 0,
                     'change': data.get('d') or 0,
                     'change_percent': data.get('dp') or 0,
@@ -125,8 +155,18 @@ class TradingDashboard:
                     'open': data.get('o') or 0,
                     'prev_close': data.get('pc') or 0
                 }
+
+                # Cache the result
+                self.price_cache[cache_key] = {
+                    'data': price_data,
+                    'timestamp': current_time
+                }
+                self.last_price_requests[cache_key] = current_time
+
+                return price_data
+
         except Exception as e:
-            # Don't show warning for every ticker, just log
+            # Don't log every failure, just cache misses
             pass
 
         return self._get_default_price_data()
@@ -143,30 +183,37 @@ class TradingDashboard:
             'prev_close': 0
         }
 
-    def get_trading_opportunities(self):
-        """Get comprehensive trading data with better error handling"""
+    @st.cache_data(ttl=300)  # Cache for 5 minutes
+    def get_trading_opportunities(_self):
+        """Get comprehensive trading data with caching"""
         try:
-            # Get sentiment data
-            recent_posts = self.firebase_manager.get_recent_posts(limit=1000, hours=24)
-            trending_24h = self.firebase_manager.get_trending_tickers(hours=24, min_mentions=2)
-            trending_1h = self.firebase_manager.get_trending_tickers(hours=1, min_mentions=1)
-            sentiment_overview = self.firebase_manager.get_sentiment_overview(hours=24)
+            # Use optimized Firebase manager with caching
+            fm = _self.firebase_manager
 
-            # Enhance with price data
+            # Get data with smaller limits and caching
+            recent_posts = fm.get_recent_posts(limit=200, hours=24, use_cache=True)  # Reduced from 1000
+            trending_24h = fm.get_trending_tickers(hours=24, min_mentions=2, use_cache=True)
+            trending_1h = fm.get_trending_tickers(hours=1, min_mentions=1, use_cache=True)
+            sentiment_overview = fm.get_sentiment_overview(hours=24, use_cache=True)
+
+            # Process only top opportunities to reduce price API calls
             enhanced_opportunities = []
 
-            for sentiment_item in sentiment_overview:
+            # Limit to top 20 tickers to reduce price API calls
+            top_sentiment_items = sentiment_overview[:20]
+
+            for sentiment_item in top_sentiment_items:
                 ticker = sentiment_item.get('ticker')
                 if ticker:
-                    # Get price data
-                    price_data = self.get_stock_price_data(ticker)
+                    # Get price data (with caching)
+                    price_data = _self.get_stock_price_data(ticker)
 
                     # Find in trending data
                     trending_info = next((t for t in trending_24h if t.get('ticker') == ticker), {})
                     recent_trending = next((t for t in trending_1h if t.get('ticker') == ticker), {})
 
                     # Calculate opportunity score
-                    opportunity_score = self.calculate_opportunity_score(
+                    opportunity_score = _self.calculate_opportunity_score(
                         sentiment_item, price_data, trending_info, recent_trending
                     )
 
@@ -190,11 +237,12 @@ class TradingDashboard:
             return {
                 'opportunities': enhanced_opportunities,
                 'total_tickers': len(enhanced_opportunities),
-                'hot_stocks': [op for op in enhanced_opportunities if op['opportunity_score'] > 50],  # Lowered threshold
+                'hot_stocks': [op for op in enhanced_opportunities if op['opportunity_score'] > 50],
                 'bullish_plays': [op for op in enhanced_opportunities if op['sentiment'] == 'bullish' and op['confidence'] > 0.5],
                 'bearish_plays': [op for op in enhanced_opportunities if op['sentiment'] == 'bearish' and op['confidence'] > 0.5],
                 'momentum_plays': [op for op in enhanced_opportunities if op['mention_count_1h'] > 0 or abs(op['change_percent']) > 1],
-                'recent_posts': recent_posts  # Add this for post listings
+                'recent_posts': recent_posts[:50],  # Limit recent posts display
+                'cache_info': fm.get_cache_stats()
             }
 
         except Exception as e:
@@ -206,11 +254,12 @@ class TradingDashboard:
                 'bullish_plays': [],
                 'bearish_plays': [],
                 'momentum_plays': [],
-                'recent_posts': []
+                'recent_posts': [],
+                'cache_info': {}
             }
 
     def calculate_opportunity_score(self, sentiment_data, price_data, trending_data, recent_trending):
-        """Calculate a trading opportunity score (0-100) with safe math operations"""
+        """Calculate a trading opportunity score (0-100)"""
         score = 0
 
         try:
@@ -236,7 +285,7 @@ class TradingDashboard:
             if mentions_1h > 0:
                 score += min(mentions_1h * 5, 20)
 
-            # Price movement factor (0-25 points) - FIXED
+            # Price movement factor (0-25 points)
             change_percent = price_data.get('change_percent', 0)
             if change_percent is not None:
                 abs_change = abs(float(change_percent))
@@ -248,20 +297,29 @@ class TradingDashboard:
                     score += 10
 
         except (ValueError, TypeError) as e:
-            # If any conversion fails, return minimum score
             pass
 
         return min(score, 100)
+
+    def render_cache_info(self, cache_info: Dict):
+        """Render cache information"""
+        if cache_info:
+            st.markdown(f"""
+            <div class="cache-info">
+            📊 <strong>Cache Status:</strong> {cache_info.get('valid_cached_queries', 0)} valid queries cached | 
+            ⏱️ Cache duration: {cache_info.get('cache_duration_seconds', 0)}s | 
+            💾 Potential API calls saved: {cache_info.get('cache_hit_potential', '0/0')}
+            </div>
+            """, unsafe_allow_html=True)
 
     def render_hot_opportunities(self, data):
         """Render top trading opportunities"""
         st.markdown("## 🔥 Hot Trading Opportunities")
 
-        hot_stocks = data['hot_stocks'][:6]  # Top 6
+        hot_stocks = data['hot_stocks'][:6]
 
         if not hot_stocks:
-            st.info("No high-scoring opportunities found. Lowering threshold or waiting for more data...")
-            # Show top opportunities anyway
+            st.info("No high-scoring opportunities found. Showing top opportunities...")
             hot_stocks = data['opportunities'][:6]
 
         if not hot_stocks:
@@ -367,7 +425,7 @@ class TradingDashboard:
                 st.info("No high-confidence bearish plays found")
 
     def render_recent_posts(self, data):
-        """Render recent posts with tickers - RESTORED FROM PREVIOUS VERSION"""
+        """Render recent posts with tickers"""
         st.markdown("## 📋 Recent WSB Activity")
 
         recent_posts = data.get('recent_posts', [])
@@ -411,60 +469,45 @@ class TradingDashboard:
         else:
             st.info("🔍 No recent posts available")
 
-    def render_momentum_tracker(self, data):
-        """Track momentum changes"""
-        st.markdown("## ⚡ Momentum Tracker")
-
-        momentum_stocks = data['momentum_plays'][:10]
-
-        if momentum_stocks:
-            df_data = []
-            for stock in momentum_stocks:
-                df_data.append({
-                    'ticker': stock['ticker'],
-                    'sentiment_score': stock['numerical_score'],
-                    'mentions_1h': max(1, stock['mention_count_1h']),  # Avoid zero for bubble size
-                    'price_change': stock['change_percent'],
-                    'opportunity_score': stock['opportunity_score']
-                })
-
-            df = pd.DataFrame(df_data)
-
-            # Create bubble chart
-            fig = px.scatter(df,
-                           x='price_change',
-                           y='sentiment_score',
-                           size='mentions_1h',
-                           color='opportunity_score',
-                           hover_name='ticker',
-                           title='📊 Momentum vs Sentiment vs Price Movement',
-                           labels={
-                               'price_change': 'Price Change %',
-                               'sentiment_score': 'Sentiment Score',
-                               'opportunity_score': 'Opportunity Score'
-                           },
-                           color_continuous_scale='RdYlGn')
-
-            fig.update_layout(
-                height=400,
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font_color='white'
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No momentum plays detected. Check back for updates!")
-
     def render_sidebar(self, data):
-        """Render trading-focused sidebar"""
+        """Render optimized sidebar with rate limiting"""
         st.sidebar.markdown("## 💰 Trading Control Panel")
 
-        # Auto-refresh
-        auto_refresh = st.sidebar.checkbox("🔄 Auto-refresh (30s)", value=False)
+        # Auto-refresh with longer intervals
+        refresh_options = {
+            "Disabled": 0,
+            "Every 5 minutes": 300,
+            "Every 10 minutes": 600,
+            "Every 15 minutes": 900
+        }
+
+        selected_refresh = st.sidebar.selectbox(
+            "🔄 Auto-refresh interval",
+            list(refresh_options.keys()),
+            index=0  # Default to disabled
+        )
+
+        auto_refresh_seconds = refresh_options[selected_refresh]
 
         if st.sidebar.button("🔄 Refresh Data"):
+            # Clear caches
+            self.firebase_manager.clear_cache()
+            st.cache_data.clear()
             st.rerun()
+
+        st.sidebar.markdown("---")
+
+        # Cache information
+        cache_info = data.get('cache_info', {})
+        if cache_info:
+            st.sidebar.markdown("## 📊 Cache Status")
+            st.sidebar.markdown(f"Valid queries: {cache_info.get('valid_cached_queries', 0)}")
+            st.sidebar.markdown(f"Total cached: {cache_info.get('total_cached_queries', 0)}")
+
+            if st.sidebar.button("🗑️ Clear Cache"):
+                self.firebase_manager.clear_cache()
+                st.cache_data.clear()
+                st.sidebar.success("Cache cleared!")
 
         st.sidebar.markdown("---")
 
@@ -486,38 +529,22 @@ class TradingDashboard:
                 change_color = "🟢" if mover['change_percent'] > 0 else "🔴"
                 st.sidebar.markdown(f"{change_color} **{mover['ticker']}**: {mover['change_percent']:+.1f}%")
 
-        # Alerts
-        st.sidebar.markdown("## 🚨 Trading Alerts")
-
-        high_confidence_plays = [op for op in data['opportunities']
-                               if op['confidence'] > 0.7 and
-                               (op['mention_count_1h'] > 0 or op['mention_count_24h'] > 5)]
-
-        if high_confidence_plays:
-            for play in high_confidence_plays[:3]:
-                st.sidebar.markdown(f"""
-                <div class="alert-box">
-                <strong>🔥 {play['ticker']}</strong><br>
-                {play['sentiment'].upper()} - {play['confidence']:.0%} confidence<br>
-                Recent mentions: {play['mention_count_1h']} (1h)
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.sidebar.info("No high-confidence alerts")
-
-        return auto_refresh
+        return auto_refresh_seconds
 
     def run(self):
         """Main dashboard run function"""
         # Header
         st.markdown('<h1 class="main-header">💰 WSB Options Trader Dashboard</h1>', unsafe_allow_html=True)
 
-        # Get trading data
+        # Get trading data (cached)
         with st.spinner("Loading trading opportunities..."):
             data = self.get_trading_opportunities()
 
+        # Render cache info
+        self.render_cache_info(data.get('cache_info', {}))
+
         # Render sidebar
-        auto_refresh = self.render_sidebar(data)
+        auto_refresh_seconds = self.render_sidebar(data)
 
         # Main content
         self.render_trading_metrics(data)
@@ -529,30 +556,26 @@ class TradingDashboard:
         self.render_options_opportunities(data)
         st.markdown("---")
 
-        self.render_momentum_tracker(data)
-        st.markdown("---")
-
-        # ADD BACK THE RECENT POSTS SECTION
         self.render_recent_posts(data)
 
         # Footer
         st.markdown("---")
         st.markdown("""
         <div style='text-align: center; color: #666;'>
-        💰 Live Trading Intelligence • 🤖 Powered by WSB Sentiment • 📊 Real-time Market Data<br>
+        💰 Live Trading Intelligence • 🤖 Powered by WSB Sentiment • 📊 Optimized for Low API Usage<br>
         ⚠️ Not financial advice. Trade at your own risk.
         </div>
         """, unsafe_allow_html=True)
 
-        # Auto-refresh
-        if auto_refresh:
-            time.sleep(30)
+        # Auto-refresh with longer intervals
+        if auto_refresh_seconds > 0:
+            time.sleep(auto_refresh_seconds)
             st.rerun()
 
 
 def main():
     """Main function"""
-    dashboard = TradingDashboard()
+    dashboard = OptimizedTradingDashboard()
     dashboard.run()
 
 

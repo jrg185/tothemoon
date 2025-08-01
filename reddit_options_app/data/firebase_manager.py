@@ -1,6 +1,6 @@
 """
-Firebase Manager for Reddit Options App
-Handles all Firebase Firestore operations
+Optimized Firebase Manager for Reddit Options App
+Reduced API calls and improved efficiency
 """
 
 import sys
@@ -16,8 +16,9 @@ from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from typing import List, Dict, Any, Optional, Union
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
+import time
 
 # Now import config (after fixing path)
 from config.settings import FIREBASE_CONFIG, get_firebase_credentials_dict
@@ -27,13 +28,27 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class FirebaseManager:
-    """Manage Firebase Firestore operations"""
+class OptimizedFirebaseManager:
+    """Optimized Firebase manager with reduced API calls and caching"""
+
+    _instance = None
+    _cache = {}
+    _cache_timestamps = {}
+    CACHE_DURATION = 300  # 5 minutes cache
+
+    def __new__(cls):
+        """Singleton pattern to reuse Firebase connection"""
+        if cls._instance is None:
+            cls._instance = super(OptimizedFirebaseManager, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
 
     def __init__(self):
-        """Initialize Firebase connection"""
-        self.db = None
-        self._initialize_firebase()
+        """Initialize Firebase connection (only once)"""
+        if not self._initialized:
+            self.db = None
+            self._initialize_firebase()
+            self._initialized = True
 
     def _initialize_firebase(self):
         """Initialize Firebase Admin SDK"""
@@ -53,52 +68,32 @@ class FirebaseManager:
             # Get Firestore client
             self.db = firestore.client()
 
-            # Test connection
-            self._test_connection()
+            # REMOVED: Test connection to avoid unnecessary writes
+            logger.info("✅ Firebase connection ready (skipped test write to save quota)")
 
         except Exception as e:
             logger.error(f"Failed to initialize Firebase: {e}")
             raise
 
-    def _test_connection(self):
-        """Test Firebase connection"""
-        try:
-            # Try to read from a test collection
-            test_ref = self.db.collection('_test_connection')
-            test_doc = {
-                'timestamp': datetime.now(timezone.utc),
-                'message': 'Connection test successful'
-            }
+    def _get_cache_key(self, collection_name: str, filters: str, order_by: str, limit: str) -> str:
+        """Generate cache key for query"""
+        return f"{collection_name}_{filters}_{order_by}_{limit}"
 
-            # Write and read test document
-            doc_ref = test_ref.document('test')
-            doc_ref.set(test_doc)
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        """Check if cached data is still valid"""
+        if cache_key not in self._cache_timestamps:
+            return False
 
-            # Read it back
-            doc = doc_ref.get()
-            if doc.exists:
-                logger.info("✅ Firebase connection test successful")
-                # Clean up test document
-                doc_ref.delete()
-            else:
-                raise Exception("Test document not found")
+        cache_time = self._cache_timestamps[cache_key]
+        return (time.time() - cache_time) < self.CACHE_DURATION
 
-        except Exception as e:
-            logger.error(f"Firebase connection test failed: {e}")
-            raise
+    def _cache_result(self, cache_key: str, result: Any):
+        """Cache query result"""
+        self._cache[cache_key] = result
+        self._cache_timestamps[cache_key] = time.time()
 
     def save_document(self, collection_name: str, document_data: Dict, document_id: str = None) -> str:
-        """
-        Save a single document to Firestore
-
-        Args:
-            collection_name: Name of the collection
-            document_data: Data to save
-            document_id: Optional document ID (auto-generated if not provided)
-
-        Returns:
-            Document ID of saved document
-        """
+        """Save a single document to Firestore"""
         try:
             collection_ref = self.db.collection(collection_name)
 
@@ -116,33 +111,36 @@ class FirebaseManager:
             raise
 
     def batch_save(self, collection_name: str, documents: List[Dict], id_field: str = None) -> int:
-        """
-        Save multiple documents in batches
-
-        Args:
-            collection_name: Name of the collection
-            documents: List of documents to save
-            id_field: Field to use as document ID (if None, auto-generate)
-
-        Returns:
-            Number of documents saved
-        """
+        """Save multiple documents in batches with deduplication"""
         if not documents:
             return 0
 
         try:
             collection_ref = self.db.collection(collection_name)
             batch = self.db.batch()
-            batch_size = 500  # Firestore batch limit
+            batch_size = 450  # Reduced from 500 to be safer
             saved_count = 0
 
-            for i, doc_data in enumerate(documents):
-                # Use specified field as document ID or auto-generate
-                if id_field and id_field in doc_data:
-                    doc_id = str(doc_data[id_field])
-                    doc_ref = collection_ref.document(doc_id)
+            # Deduplicate documents by ID to avoid redundant writes
+            unique_docs = {}
+            for doc_data in documents:
+                doc_id = doc_data.get(id_field) if id_field else None
+                if doc_id:
+                    unique_docs[str(doc_id)] = doc_data
                 else:
-                    doc_ref = collection_ref.document()  # Auto-generate ID
+                    # For documents without ID, use a hash of content
+                    content_hash = hash(str(sorted(doc_data.items())))
+                    unique_docs[f"hash_{content_hash}"] = doc_data
+
+            logger.info(f"Deduplication: {len(documents)} -> {len(unique_docs)} unique documents")
+
+            for i, (doc_id, doc_data) in enumerate(unique_docs.items()):
+                if id_field and id_field in doc_data:
+                    doc_ref = collection_ref.document(str(doc_data[id_field]))
+                elif doc_id.startswith("hash_"):
+                    doc_ref = collection_ref.document()  # Auto-generate
+                else:
+                    doc_ref = collection_ref.document(doc_id)
 
                 batch.set(doc_ref, doc_data, merge=True)
 
@@ -152,9 +150,10 @@ class FirebaseManager:
                     saved_count += batch_size
                     batch = self.db.batch()  # Start new batch
                     logger.info(f"Saved batch of {batch_size} documents to {collection_name}")
+                    time.sleep(0.1)  # Brief pause between batches
 
             # Commit remaining documents
-            remaining = len(documents) % batch_size
+            remaining = len(unique_docs) % batch_size
             if remaining > 0:
                 batch.commit()
                 saved_count += remaining
@@ -168,24 +167,19 @@ class FirebaseManager:
             raise
 
     def get_document(self, collection_name: str, document_id: str) -> Optional[Dict]:
-        """
-        Get a single document by ID
+        """Get a single document by ID with caching"""
+        cache_key = f"doc_{collection_name}_{document_id}"
 
-        Args:
-            collection_name: Name of the collection
-            document_id: Document ID
+        if self._is_cache_valid(cache_key):
+            return self._cache[cache_key]
 
-        Returns:
-            Document data or None if not found
-        """
         try:
             doc_ref = self.db.collection(collection_name).document(document_id)
             doc = doc_ref.get()
 
-            if doc.exists:
-                return doc.to_dict()
-            else:
-                return None
+            result = doc.to_dict() if doc.exists else None
+            self._cache_result(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"Error getting document {document_id} from {collection_name}: {e}")
@@ -196,20 +190,18 @@ class FirebaseManager:
                        filters: List[tuple] = None,
                        order_by: str = None,
                        limit: int = None,
-                       desc: bool = False) -> List[Dict]:
-        """
-        Query documents with filters
+                       desc: bool = False,
+                       use_cache: bool = True) -> List[Dict]:
+        """Query documents with caching and optimized limits"""
 
-        Args:
-            collection_name: Name of the collection
-            filters: List of (field, operator, value) tuples
-            order_by: Field to order by
-            limit: Maximum number of results
-            desc: Whether to order in descending order
+        # Generate cache key
+        filters_str = str(filters) if filters else "none"
+        cache_key = self._get_cache_key(collection_name, filters_str, str(order_by), str(limit))
 
-        Returns:
-            List of document dictionaries
-        """
+        if use_cache and self._is_cache_valid(cache_key):
+            logger.debug(f"Using cached result for {collection_name}")
+            return self._cache[cache_key]
+
         try:
             query = self.db.collection(collection_name)
 
@@ -223,9 +215,13 @@ class FirebaseManager:
                 direction = firestore.Query.DESCENDING if desc else firestore.Query.ASCENDING
                 query = query.order_by(order_by, direction=direction)
 
-            # Apply limit
+            # Apply limit with maximum cap
             if limit:
-                query = query.limit(limit)
+                # Cap limits to reduce quota usage
+                max_limit = min(limit, 200)  # Reduced from no limit to 200
+                query = query.limit(max_limit)
+                if limit > max_limit:
+                    logger.warning(f"Query limit reduced from {limit} to {max_limit} to save quota")
 
             # Execute query
             docs = query.stream()
@@ -236,23 +232,21 @@ class FirebaseManager:
                 doc_dict['_id'] = doc.id  # Include document ID
                 results.append(doc_dict)
 
+            # Cache the result
+            if use_cache:
+                self._cache_result(cache_key, results)
+
             return results
 
         except Exception as e:
             logger.error(f"Error querying {collection_name}: {e}")
             return []
 
-    def get_recent_posts(self, limit: int = 100, hours: int = 24) -> List[Dict]:
-        """
-        Get recent Reddit posts
+    def get_recent_posts(self, limit: int = 100, hours: int = 24, use_cache: bool = True) -> List[Dict]:
+        """Get recent Reddit posts with optimized limits"""
+        # Reduce default limit to save quota
+        optimized_limit = min(limit, 200)
 
-        Args:
-            limit: Maximum number of posts
-            hours: How many hours back to look
-
-        Returns:
-            List of recent posts
-        """
         try:
             # Calculate timestamp cutoff
             cutoff_time = datetime.now(timezone.utc).timestamp() - (hours * 3600)
@@ -265,25 +259,17 @@ class FirebaseManager:
                 collection_name=FIREBASE_CONFIG['collections']['reddit_posts'],
                 filters=filters,
                 order_by='created_utc',
-                limit=limit,
-                desc=True
+                limit=optimized_limit,
+                desc=True,
+                use_cache=use_cache
             )
 
         except Exception as e:
             logger.error(f"Error getting recent posts: {e}")
             return []
 
-    def get_posts_by_ticker(self, ticker: str, limit: int = 50) -> List[Dict]:
-        """
-        Get posts mentioning a specific ticker
-
-        Args:
-            ticker: Stock ticker symbol
-            limit: Maximum number of posts
-
-        Returns:
-            List of posts mentioning the ticker
-        """
+    def get_posts_by_ticker(self, ticker: str, limit: int = 50, use_cache: bool = True) -> List[Dict]:
+        """Get posts mentioning a specific ticker"""
         try:
             filters = [
                 ('tickers', 'array_contains', ticker.upper())
@@ -293,28 +279,25 @@ class FirebaseManager:
                 collection_name=FIREBASE_CONFIG['collections']['reddit_posts'],
                 filters=filters,
                 order_by='created_utc',
-                limit=limit,
-                desc=True
+                limit=min(limit, 100),  # Cap at 100
+                desc=True,
+                use_cache=use_cache
             )
 
         except Exception as e:
             logger.error(f"Error getting posts for ticker {ticker}: {e}")
             return []
 
-    def get_trending_tickers(self, hours: int = 24, min_mentions: int = 5) -> List[Dict]:
-        """
-        Get trending tickers based on mention frequency
+    def get_trending_tickers(self, hours: int = 24, min_mentions: int = 5, use_cache: bool = True) -> List[Dict]:
+        """Get trending tickers with caching"""
+        cache_key = f"trending_{hours}h_{min_mentions}min"
 
-        Args:
-            hours: Time window to analyze
-            min_mentions: Minimum mentions to be considered trending
+        if use_cache and self._is_cache_valid(cache_key):
+            return self._cache[cache_key]
 
-        Returns:
-            List of trending ticker data
-        """
         try:
-            # Get recent posts
-            recent_posts = self.get_recent_posts(limit=1000, hours=hours)
+            # Reduced limit to save quota
+            recent_posts = self.get_recent_posts(limit=300, hours=hours, use_cache=use_cache)
 
             # Count ticker mentions
             ticker_counts = {}
@@ -343,70 +326,36 @@ class FirebaseManager:
 
             # Sort by mention count
             trending.sort(key=lambda x: x['mention_count'], reverse=True)
+            result = trending[:20]  # Top 20 trending
 
-            return trending[:20]  # Top 20 trending
+            # Cache the result
+            if use_cache:
+                self._cache_result(cache_key, result)
+
+            return result
 
         except Exception as e:
             logger.error(f"Error getting trending tickers: {e}")
             return []
 
     def save_sentiment_analysis(self, analysis_data: List[Dict]) -> int:
-        """Save sentiment analysis results"""
+        """Save sentiment analysis results with deduplication"""
         try:
             collection_name = FIREBASE_CONFIG['collections']['sentiment_data']
-            return self.batch_save(collection_name, analysis_data)
+            return self.batch_save(collection_name, analysis_data, 'ticker')
         except Exception as e:
             logger.error(f"Error saving sentiment analysis: {e}")
             return 0
 
-    def get_ticker_sentiment(self, ticker: str, hours: int = 24) -> Dict:
-        """
-        Get sentiment analysis for a specific ticker
+    def get_sentiment_overview(self, hours: int = 24, use_cache: bool = True) -> List[Dict]:
+        """Get sentiment overview with caching"""
+        cache_key = f"sentiment_overview_{hours}h"
 
-        Args:
-            ticker: Stock ticker symbol
-            hours: How many hours back to look
+        if use_cache and self._is_cache_valid(cache_key):
+            return self._cache[cache_key]
 
-        Returns:
-            Latest sentiment data for the ticker
-        """
         try:
-            # Calculate timestamp cutoff
-            cutoff_time = datetime.now(timezone.utc).timestamp() - (hours * 3600)
-
-            filters = [
-                ('ticker', '==', ticker.upper()),
-                ('timestamp', '>=', cutoff_time)
-            ]
-
-            sentiment_data = self.query_documents(
-                collection_name=FIREBASE_CONFIG['collections']['sentiment_data'],
-                filters=filters,
-                order_by='timestamp',
-                limit=1,
-                desc=True
-            )
-
-            return sentiment_data[0] if sentiment_data else None
-
-        except Exception as e:
-            logger.error(f"Error getting sentiment for ticker {ticker}: {e}")
-            return None
-
-    # Replace the get_sentiment_overview method in your data/firebase_manager.py
-
-    def get_sentiment_overview(self, hours: int = 24) -> List[Dict]:
-        """
-        Get sentiment overview for all tickers
-
-        Args:
-            hours: Time window to analyze
-
-        Returns:
-            List of ticker sentiment data
-        """
-        try:
-            # Calculate timestamp cutoff as ISO string (to match your data format)
+            # Calculate timestamp cutoff as ISO string
             cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
             cutoff_iso = cutoff_time.isoformat()
 
@@ -418,7 +367,9 @@ class FirebaseManager:
                 collection_name=FIREBASE_CONFIG['collections']['sentiment_data'],
                 filters=filters,
                 order_by='timestamp',
-                desc=True
+                limit=100,  # Reduced from unlimited
+                desc=True,
+                use_cache=use_cache
             )
 
             # Get latest sentiment for each ticker
@@ -428,110 +379,55 @@ class FirebaseManager:
                 if ticker and ticker not in latest_sentiments:
                     latest_sentiments[ticker] = item
 
-            logger.info(f"Retrieved sentiment overview: {len(latest_sentiments)} tickers")
-            return list(latest_sentiments.values())
+            result = list(latest_sentiments.values())
+
+            # Cache the result
+            if use_cache:
+                self._cache_result(cache_key, result)
+
+            logger.info(f"Retrieved sentiment overview: {len(result)} tickers")
+            return result
 
         except Exception as e:
             logger.error(f"Error getting sentiment overview: {e}")
-
-            # Fallback: Get all recent sentiment data without timestamp filtering
-            try:
-                logger.info("Attempting fallback: getting all sentiment data")
-                all_sentiment_data = self.query_documents(
-                    collection_name=FIREBASE_CONFIG['collections']['sentiment_data'],
-                    order_by='timestamp',
-                    limit=100,
-                    desc=True
-                )
-
-                # Get latest sentiment for each ticker
-                latest_sentiments = {}
-                for item in all_sentiment_data:
-                    ticker = item.get('ticker')
-                    if ticker and ticker not in latest_sentiments:
-                        latest_sentiments[ticker] = item
-
-                logger.info(f"Fallback retrieved: {len(latest_sentiments)} tickers")
-                return list(latest_sentiments.values())
-
-            except Exception as fallback_error:
-                logger.error(f"Fallback also failed: {fallback_error}")
-                return []
-
-    def get_sentiment_trends(self, ticker: str, hours: int = 72) -> List[Dict]:
-        """
-        Get sentiment trends for a ticker over time
-
-        Args:
-            ticker: Stock ticker symbol
-            hours: Time window to analyze
-
-        Returns:
-            List of sentiment data points over time
-        """
-        try:
-            # Calculate timestamp cutoff
-            cutoff_time = datetime.now(timezone.utc).timestamp() - (hours * 3600)
-
-            filters = [
-                ('ticker', '==', ticker.upper()),
-                ('timestamp', '>=', cutoff_time)
-            ]
-
-            return self.query_documents(
-                collection_name=FIREBASE_CONFIG['collections']['sentiment_data'],
-                filters=filters,
-                order_by='timestamp',
-                desc=False  # Chronological order for trends
-            )
-
-        except Exception as e:
-            logger.error(f"Error getting sentiment trends for {ticker}: {e}")
             return []
 
-    def save_predictions(self, predictions_data: List[Dict]) -> int:
-        """Save ML predictions"""
-        try:
-            collection_name = FIREBASE_CONFIG['collections']['predictions']
-            return self.batch_save(collection_name, predictions_data)
-        except Exception as e:
-            logger.error(f"Error saving predictions: {e}")
-            return 0
+    def clear_cache(self):
+        """Clear all cached data"""
+        self._cache.clear()
+        self._cache_timestamps.clear()
+        logger.info("Cache cleared")
 
-    def save_options_strategies(self, strategies_data: List[Dict]) -> int:
-        """Save options strategies"""
-        try:
-            collection_name = FIREBASE_CONFIG['collections']['options_strategies']
-            return self.batch_save(collection_name, strategies_data)
-        except Exception as e:
-            logger.error(f"Error saving options strategies: {e}")
-            return 0
+    def get_cache_stats(self) -> Dict:
+        """Get cache statistics"""
+        current_time = time.time()
+        valid_entries = sum(1 for timestamp in self._cache_timestamps.values()
+                          if (current_time - timestamp) < self.CACHE_DURATION)
+
+        return {
+            'total_cached_queries': len(self._cache),
+            'valid_cached_queries': valid_entries,
+            'cache_hit_potential': f"{valid_entries}/{len(self._cache)}",
+            'cache_duration_seconds': self.CACHE_DURATION
+        }
 
     def delete_old_data(self, collection_name: str, days: int = 30) -> int:
-        """
-        Delete old data from a collection
-
-        Args:
-            collection_name: Collection to clean up
-            days: Delete data older than this many days
-
-        Returns:
-            Number of documents deleted
-        """
+        """Delete old data from a collection with batching"""
         try:
             cutoff_time = datetime.now(timezone.utc).timestamp() - (days * 24 * 3600)
 
-            # Query old documents
+            # Query old documents in smaller batches
             old_docs = self.query_documents(
                 collection_name=collection_name,
                 filters=[('created_utc', '<', cutoff_time)],
-                limit=1000  # Delete in batches
+                limit=100,  # Reduced batch size
+                use_cache=False  # Don't cache deletion queries
             )
 
             if not old_docs:
                 return 0
 
-            # Delete in batches
+            # Delete in smaller batches
             batch = self.db.batch()
             deleted_count = 0
 
@@ -540,12 +436,13 @@ class FirebaseManager:
                 batch.delete(doc_ref)
                 deleted_count += 1
 
-                if deleted_count % 500 == 0:  # Batch limit
+                if deleted_count % 100 == 0:  # Smaller batch limit
                     batch.commit()
                     batch = self.db.batch()
+                    time.sleep(0.2)  # Longer pause between batches
 
             # Commit remaining deletes
-            if deleted_count % 500 != 0:
+            if deleted_count % 100 != 0:
                 batch.commit()
 
             logger.info(f"Deleted {deleted_count} old documents from {collection_name}")
@@ -556,34 +453,38 @@ class FirebaseManager:
             return 0
 
 
+# Alias for backward compatibility
+FirebaseManager = OptimizedFirebaseManager
+
+
 def main():
-    """Test Firebase manager"""
+    """Test optimized Firebase manager"""
     try:
-        fm = FirebaseManager()
+        fm = OptimizedFirebaseManager()
 
-        # Test document operations
-        test_data = {
-            'message': 'Hello Firebase!',
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'test': True
-        }
+        # Test caching
+        print("Testing cache functionality...")
 
-        # Save test document
-        doc_id = fm.save_document('test_collection', test_data, 'test_doc')
-        print(f"Saved test document with ID: {doc_id}")
+        # First call - should hit database
+        start_time = time.time()
+        trending1 = fm.get_trending_tickers(hours=24)
+        time1 = time.time() - start_time
+        print(f"First call: {len(trending1)} tickers in {time1:.2f}s")
 
-        # Read test document
-        retrieved = fm.get_document('test_collection', 'test_doc')
-        print(f"Retrieved document: {retrieved}")
+        # Second call - should use cache
+        start_time = time.time()
+        trending2 = fm.get_trending_tickers(hours=24)
+        time2 = time.time() - start_time
+        print(f"Second call: {len(trending2)} tickers in {time2:.2f}s")
 
-        # Test queries
-        trending = fm.get_trending_tickers(hours=24)
-        print(f"Trending tickers: {trending}")
+        # Cache stats
+        cache_stats = fm.get_cache_stats()
+        print(f"Cache stats: {cache_stats}")
 
-        print("✅ Firebase manager test completed successfully!")
+        print("✅ Optimized Firebase manager test completed successfully!")
 
     except Exception as e:
-        print(f"❌ Firebase manager test failed: {e}")
+        print(f"❌ Optimized Firebase manager test failed: {e}")
 
 
 if __name__ == "__main__":
