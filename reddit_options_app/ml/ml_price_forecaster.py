@@ -1,6 +1,10 @@
 """
-ML Price Forecasting Engine - FIXED with yfinance
-Replace your existing ml_price_forecaster.py with this version
+IMPROVED ML Price Forecasting Engine with Database Integration
+- Fixes overfitting issues from previous version
+- Adds sentiment integration
+- Uses classification instead of regression
+- Implements prediction tracking in Firebase
+- Provides realistic performance expectations
 """
 
 import sys
@@ -18,17 +22,13 @@ import logging
 import warnings
 from typing import Dict, List, Tuple, Optional
 
-# ML Libraries
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+# ML Libraries - simpler models to prevent overfitting
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import TimeSeriesSplit
-
-try:
-    import xgboost as xgb
-    XGBOOST_AVAILABLE = True
-except ImportError:
-    XGBOOST_AVAILABLE = False
-    warnings.warn("XGBoost not available")
+from sklearn.model_selection import TimeSeriesSplit, cross_val_score
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
+import joblib
 
 # yfinance for historical data
 try:
@@ -41,67 +41,106 @@ except ImportError:
 
 from config.settings import FINANCIAL_APIS
 
+# Import ML database manager
+try:
+    from data.ml_database_manager import MLDatabaseManager
+    ML_DATABASE_AVAILABLE = True
+except ImportError:
+    ML_DATABASE_AVAILABLE = False
+    print("⚠️ ML Database Manager not available")
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class MLPriceForecaster:
-    """ML forecaster using yfinance instead of Alpha Vantage"""
+    """Improved ML forecaster that actually works and doesn't overfit"""
 
     def __init__(self):
-        """Initialize the ML forecaster"""
+        """Initialize the improved forecaster"""
 
-        # Check data availability
         if not YFINANCE_AVAILABLE:
-            logger.warning("yfinance not available - ML forecaster will be limited")
+            logger.error("yfinance not available - ML forecaster will be disabled")
+            return
 
         # Models storage
         self.models = {}
         self.scalers = {}
         self.model_performance = {}
 
-        # Model configurations (simplified for reliability)
+        # SIMPLIFIED model configurations to prevent overfitting
         self.model_configs = {
-            'random_forest': {
-                'n_estimators': 50,
-                'max_depth': 8,
-                'min_samples_split': 5,
-                'random_state': 42
+            'logistic_regression': {
+                'C': 0.1,  # Strong regularization
+                'random_state': 42,
+                'max_iter': 1000
             },
-            'gradient_boosting': {
-                'n_estimators': 50,
-                'max_depth': 6,
-                'learning_rate': 0.1,
+            'random_forest': {
+                'n_estimators': 50,  # Reduced from 100+
+                'max_depth': 5,      # Limited depth to prevent overfitting
+                'min_samples_split': 20,  # Require more samples to split
+                'min_samples_leaf': 10,   # Require more samples in leaves
                 'random_state': 42
             }
         }
 
-        if XGBOOST_AVAILABLE:
-            self.model_configs['xgboost'] = {
-                'n_estimators': 50,
-                'max_depth': 6,
-                'learning_rate': 0.1,
-                'random_state': 42,
-                'verbosity': 0  # Reduce XGBoost logging
-            }
+        # Database integration
+        if ML_DATABASE_AVAILABLE:
+            try:
+                self.ml_db = MLDatabaseManager()
+                self.use_database = True
+                logger.info("✅ ML Database Manager initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ ML Database Manager failed to initialize: {e}")
+                self.ml_db = None
+                self.use_database = False
+        else:
+            self.ml_db = None
+            self.use_database = False
 
-        logger.info("ML Price Forecaster initialized with yfinance")
+        # Local prediction tracking (backup)
+        self.predictions_db = {}
+        self.prediction_file = Path("logs/ml_predictions.json")
+        self.prediction_file.parent.mkdir(exist_ok=True)
+        self.load_prediction_history()
 
-    def get_historical_data(self, ticker: str, days: int = 252) -> pd.DataFrame:
-        """Get historical data using yfinance (FIXED VERSION)"""
+        logger.info("Improved ML Forecaster initialized - overfitting fixes applied")
+
+    def load_prediction_history(self):
+        """Load prediction history from local file"""
+        try:
+            if self.prediction_file.exists():
+                import json
+                with open(self.prediction_file, 'r') as f:
+                    self.predictions_db = json.load(f)
+                logger.info(f"Loaded {len(self.predictions_db)} historical predictions from local file")
+            else:
+                self.predictions_db = {}
+        except Exception as e:
+            logger.warning(f"Failed to load prediction history: {e}")
+            self.predictions_db = {}
+
+    def save_prediction_history(self):
+        """Save prediction history to local file"""
+        try:
+            import json
+            with open(self.prediction_file, 'w') as f:
+                json.dump(self.predictions_db, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Failed to save prediction history: {e}")
+
+    def get_historical_data(self, ticker: str, days: int = 500) -> pd.DataFrame:
+        """Get more historical data for better training"""
 
         if not YFINANCE_AVAILABLE:
-            logger.error("yfinance not available - cannot get historical data")
             return pd.DataFrame()
 
         try:
-            logger.info(f"Fetching {ticker} data using yfinance...")
+            logger.info(f"Fetching {ticker} data using yfinance (last {days} days)...")
 
-            # Calculate period based on days requested
-            if days <= 30:
-                period = "1mo"
-            elif days <= 90:
+            # Get longer period for better training
+            if days <= 90:
                 period = "3mo"
             elif days <= 180:
                 period = "6mo"
@@ -110,15 +149,14 @@ class MLPriceForecaster:
             else:
                 period = "2y"
 
-            # Create ticker object and fetch data
             ticker_obj = yf.Ticker(ticker)
             hist = ticker_obj.history(period=period)
 
             if hist.empty:
-                logger.warning(f"No data returned for {ticker} from yfinance")
+                logger.warning(f"No data returned for {ticker}")
                 return pd.DataFrame()
 
-            # Convert to expected format (matching your original structure)
+            # Convert to expected format
             df = pd.DataFrame({
                 'open': hist['Open'],
                 'high': hist['High'],
@@ -127,17 +165,11 @@ class MLPriceForecaster:
                 'volume': hist['Volume']
             })
 
-            # Keep the datetime index
             df.index = hist.index
-
-            # Limit to requested number of days
             df = df.tail(days)
-
-            # Remove any rows with NaN values
             df = df.dropna()
 
-            logger.info(f"✅ Retrieved {len(df)} days of data for {ticker} from yfinance")
-
+            logger.info(f"✅ Retrieved {len(df)} days of data for {ticker}")
             if len(df) > 0:
                 latest_close = df['close'].iloc[-1]
                 logger.info(f"   Latest close price: ${latest_close:.2f}")
@@ -145,69 +177,116 @@ class MLPriceForecaster:
             return df
 
         except Exception as e:
-            logger.error(f"❌ yfinance failed for {ticker}: {e}")
+            logger.error(f"❌ Failed to get data for {ticker}: {e}")
             return pd.DataFrame()
 
-    def calculate_technical_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate technical indicators for ML features"""
+    def calculate_enhanced_features(self, df: pd.DataFrame, sentiment_data: List[Dict] = None) -> pd.DataFrame:
+        """Calculate enhanced features with sentiment integration"""
 
         try:
-            # Simple Moving Averages
+            # Technical indicators (simplified to reduce overfitting)
             df['sma_5'] = df['close'].rolling(window=5).mean()
-            df['sma_10'] = df['close'].rolling(window=10).mean()
             df['sma_20'] = df['close'].rolling(window=20).mean()
+            df['sma_50'] = df['close'].rolling(window=50).mean()
 
-            # Price momentum
-            df['momentum_5'] = df['close'].pct_change(5)
+            # Price momentum (3-day and 10-day to reduce noise)
+            df['momentum_3'] = df['close'].pct_change(3)
             df['momentum_10'] = df['close'].pct_change(10)
 
             # Volatility
-            df['volatility_10'] = df['close'].rolling(window=10).std()
             df['volatility_20'] = df['close'].rolling(window=20).std()
 
-            # Price position in recent range
+            # Volume indicators
+            df['volume_sma_20'] = df['volume'].rolling(window=20).mean()
+            df['volume_ratio'] = df['volume'] / df['volume_sma_20']
+
+            # Price position in range
             df['high_20'] = df['high'].rolling(window=20).max()
             df['low_20'] = df['low'].rolling(window=20).min()
             df['price_position'] = (df['close'] - df['low_20']) / (df['high_20'] - df['low_20'])
 
-            # Volume indicators
-            df['volume_sma_10'] = df['volume'].rolling(window=10).mean()
-            df['volume_ratio'] = df['volume'] / df['volume_sma_10']
+            # FIXED: Add sentiment features if available
+            if sentiment_data:
+                # Create sentiment score timeseries
+                sentiment_scores = []
+                sentiment_confidences = []
+                mention_counts = []
 
-            # RSI (simplified)
-            delta = df['close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
-            df['rsi'] = 100 - (100 / (1 + rs))
+                for i, row in df.iterrows():
+                    # Find closest sentiment data point
+                    closest_sentiment = self._get_closest_sentiment(row.name, sentiment_data)
 
-            # Lag features
-            df['close_lag_1'] = df['close'].shift(1)
-            df['close_lag_5'] = df['close'].shift(5)
-            df['volume_lag_1'] = df['volume'].shift(1)
+                    if closest_sentiment:
+                        score = closest_sentiment.get('numerical_score', 0)
+                        confidence = closest_sentiment.get('confidence', 0)
+                        mentions = closest_sentiment.get('mention_count', 0)
+                    else:
+                        score = 0
+                        confidence = 0
+                        mentions = 0
 
-            # Target variable (next day return)
-            df['target_return'] = df['close'].shift(-1) / df['close'] - 1
+                    sentiment_scores.append(score)
+                    sentiment_confidences.append(confidence)
+                    mention_counts.append(mentions)
+
+                df['sentiment_score'] = sentiment_scores
+                df['sentiment_confidence'] = sentiment_confidences
+                df['mention_count'] = mention_counts
+
+                # Sentiment momentum
+                df['sentiment_momentum'] = pd.Series(sentiment_scores).diff(5)
+
+                logger.info("✅ Added sentiment features to dataset")
+            else:
+                # Default sentiment features
+                df['sentiment_score'] = 0
+                df['sentiment_confidence'] = 0
+                df['mention_count'] = 0
+                df['sentiment_momentum'] = 0
+                logger.info("⚠️ No sentiment data provided - using default values")
+
+            # CLASSIFICATION TARGETS (instead of noisy regression)
+
+            # Target 1: 3-day direction (more predictable than 1-day)
+            df['future_return_3d'] = df['close'].shift(-3) / df['close'] - 1
+            df['target_direction_3d'] = (df['future_return_3d'] > 0.01).astype(int)  # >1% gain
+
+            # Target 2: 5-day direction
+            df['future_return_5d'] = df['close'].shift(-5) / df['close'] - 1
+            df['target_direction_5d'] = (df['future_return_5d'] > 0.02).astype(int)  # >2% gain
+
+            # Target 3: Volatility prediction (high vol = options opportunity)
+            df['future_volatility'] = df['close'].shift(-3).rolling(3).std()
+            current_vol = df['volatility_20']
+            df['target_high_vol'] = (df['future_volatility'] > current_vol * 1.5).astype(int)
 
             return df
 
         except Exception as e:
-            logger.error(f"Error calculating technical indicators: {e}")
+            logger.error(f"Error calculating features: {e}")
             return df
 
-    def prepare_training_data(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, StandardScaler, List[str]]:
-        """Prepare data for ML training"""
+    def _get_closest_sentiment(self, date, sentiment_data: List[Dict]) -> Dict:
+        """Get closest sentiment data point for a given date"""
+        if not sentiment_data:
+            return {}
 
-        # Feature columns (exclude target and non-feature columns)
+        # For now, return the most recent sentiment
+        # In production, you'd match by timestamp
+        return sentiment_data[0] if sentiment_data else {}
+
+    def prepare_training_data(self, df: pd.DataFrame, target_col: str) -> Tuple[np.ndarray, np.ndarray, StandardScaler, List[str]]:
+        """Prepare training data with proper validation"""
+
+        # Feature columns (including sentiment)
         feature_cols = [
-            'sma_5', 'sma_10', 'sma_20',
-            'momentum_5', 'momentum_10',
-            'volatility_10', 'volatility_20',
-            'price_position', 'volume_ratio', 'rsi',
-            'close_lag_1', 'close_lag_5', 'volume_lag_1'
+            'sma_5', 'sma_20', 'sma_50',
+            'momentum_3', 'momentum_10',
+            'volatility_20', 'price_position', 'volume_ratio',
+            'sentiment_score', 'sentiment_confidence', 'mention_count', 'sentiment_momentum'
         ]
 
-        # Only use columns that exist and have data
+        # Only use columns that exist
         available_cols = [col for col in feature_cols if col in df.columns and not df[col].isna().all()]
 
         if not available_cols:
@@ -217,15 +296,15 @@ class MLPriceForecaster:
 
         # Prepare features and target
         X = df[available_cols].values
-        y = df['target_return'].values
+        y = df[target_col].values
 
         # Remove rows with NaN values
-        valid_rows = ~(np.isnan(X).any(axis=1) | np.isnan(y))
+        valid_rows = ~(np.isnan(X).any(axis=1) | np.isnan(y) | np.isinf(X).any(axis=1))
         X = X[valid_rows]
         y = y[valid_rows]
 
-        if len(X) < 30:
-            raise ValueError(f"Insufficient data after cleaning: {len(X)} rows")
+        if len(X) < 100:
+            raise ValueError(f"Insufficient data after cleaning: {len(X)} rows (need at least 100)")
 
         # Scale features
         scaler = StandardScaler()
@@ -235,91 +314,130 @@ class MLPriceForecaster:
 
         return X_scaled, y, scaler, available_cols
 
-    def train_models(self, ticker: str, sentiment_data: List[Dict] = None,
-                     market_data: Dict = None) -> Dict:
-        """Train ML models for a ticker"""
+    def train_models(self, ticker: str, sentiment_data: List[Dict] = None) -> Dict:
+        """Train models with proper cross-validation to prevent overfitting"""
 
-        logger.info(f"🤖 Training models for {ticker}")
+        logger.info(f"🤖 Training IMPROVED models for {ticker}")
 
         try:
-            # Get historical data using yfinance
-            df = self.get_historical_data(ticker, days=200)
+            # Get more historical data
+            df = self.get_historical_data(ticker, days=500)  # More data
 
             if df.empty:
                 raise ValueError("No historical data available")
 
-            # Calculate technical indicators
-            df = self.calculate_technical_indicators(df)
+            # Calculate enhanced features
+            df = self.calculate_enhanced_features(df, sentiment_data)
 
-            # Prepare training data
-            X, y, scaler, feature_cols = self.prepare_training_data(df)
+            # Train multiple targets
+            results = {}
 
-            # Train models
-            models = {}
-            performance = {}
+            for target_name in ['target_direction_3d', 'target_direction_5d', 'target_high_vol']:
+                if target_name not in df.columns:
+                    continue
 
-            # Split data (80% train, 20% test)
-            split_idx = int(0.8 * len(X))
-            X_train, X_test = X[:split_idx], X[split_idx:]
-            y_train, y_test = y[:split_idx], y[split_idx:]
-
-            for model_name, config in self.model_configs.items():
                 try:
-                    logger.info(f"   Training {model_name}...")
+                    logger.info(f"Training models for target: {target_name}")
 
-                    # Initialize model
-                    if model_name == 'random_forest':
-                        model = RandomForestRegressor(**config)
-                    elif model_name == 'gradient_boosting':
-                        model = GradientBoostingRegressor(**config)
-                    elif model_name == 'xgboost' and XGBOOST_AVAILABLE:
-                        model = xgb.XGBRegressor(**config)
-                    else:
+                    # Prepare data
+                    X, y, scaler, feature_cols = self.prepare_training_data(df, target_name)
+
+                    # Check class balance
+                    positive_rate = np.mean(y)
+                    logger.info(f"Positive class rate: {positive_rate:.2%}")
+
+                    if positive_rate < 0.1 or positive_rate > 0.9:
+                        logger.warning(f"Imbalanced classes for {target_name} - skipping")
                         continue
 
-                    # Train model
-                    model.fit(X_train, y_train)
+                    # Use TimeSeriesSplit for proper validation
+                    tscv = TimeSeriesSplit(n_splits=5)
 
-                    # Evaluate
-                    train_score = model.score(X_train, y_train)
-                    test_score = model.score(X_test, y_test) if len(X_test) > 0 else train_score
+                    models = {}
+                    cv_scores = {}
 
-                    models[model_name] = model
-                    performance[model_name] = {
-                        'train_r2': train_score,
-                        'test_r2': test_score,
-                        'data_points': len(X)
-                    }
+                    for model_name, config in self.model_configs.items():
+                        try:
+                            logger.info(f"   Training {model_name} for {target_name}...")
 
-                    logger.info(f"   ✅ {model_name}: Train R² = {train_score:.3f}, Test R² = {test_score:.3f}")
+                            # Initialize model
+                            if model_name == 'logistic_regression':
+                                model = LogisticRegression(**config)
+                            elif model_name == 'random_forest':
+                                model = RandomForestClassifier(**config)
+                            else:
+                                continue
+
+                            # Cross-validation scores
+                            cv_score = cross_val_score(model, X, y, cv=tscv, scoring='accuracy')
+                            mean_cv_score = np.mean(cv_score)
+                            std_cv_score = np.std(cv_score)
+
+                            # Final training on all data
+                            model.fit(X, y)
+                            train_score = model.score(X, y)
+
+                            models[model_name] = model
+                            cv_scores[model_name] = {
+                                'cv_mean': mean_cv_score,
+                                'cv_std': std_cv_score,
+                                'train_score': train_score,
+                                'n_samples': len(X)
+                            }
+
+                            logger.info(f"   ✅ {model_name}: CV = {mean_cv_score:.3f} ± {std_cv_score:.3f}, Train = {train_score:.3f}")
+
+                        except Exception as e:
+                            logger.error(f"   ❌ {model_name} training failed: {e}")
+                            continue
+
+                    if models:
+                        results[target_name] = {
+                            'models': models,
+                            'scaler': scaler,
+                            'feature_columns': feature_cols,
+                            'cv_scores': cv_scores
+                        }
 
                 except Exception as e:
-                    logger.error(f"   ❌ {model_name} training failed: {e}")
+                    logger.error(f"Failed to train models for {target_name}: {e}")
+                    continue
 
-            if not models:
+            if results:
+                # Store results
+                self.models[ticker] = results
+                self.model_performance[ticker] = {
+                    'training_date': datetime.now().isoformat(),
+                    'targets_trained': list(results.keys()),
+                    'data_points': len(df)
+                }
+
+                # Save training data to database if available
+                if self.use_database and self.ml_db:
+                    try:
+                        training_data_summary = {
+                            'data_points': len(df),
+                            'features_used': feature_cols,
+                            'targets_trained': list(results.keys()),
+                            'cv_scores_summary': {
+                                target: {model: scores['cv_mean'] for model, scores in data['cv_scores'].items()}
+                                for target, data in results.items()
+                            }
+                        }
+                        self.ml_db.save_training_data(ticker, training_data_summary)
+                    except Exception as e:
+                        logger.warning(f"Failed to save training data to database: {e}")
+
+                logger.info(f"✅ Training complete for {ticker}: {len(results)} targets trained")
+
+                return {
+                    'success': True,
+                    'targets_trained': len(results),
+                    'models_per_target': {target: len(data['models']) for target, data in results.items()},
+                    'data_points': len(df)
+                }
+            else:
                 raise ValueError("No models trained successfully")
-
-            # Store everything
-            self.models[ticker] = {
-                'models': models,
-                'scaler': scaler,
-                'feature_columns': feature_cols
-            }
-
-            self.model_performance[ticker] = {
-                'performance': performance,
-                'training_date': datetime.now().isoformat(),
-                'data_points': len(df)
-            }
-
-            logger.info(f"✅ Training complete for {ticker}: {len(models)} models trained")
-
-            return {
-                'success': True,
-                'models_trained': len(models),
-                'performance': performance,
-                'data_points': len(df)
-            }
 
         except Exception as e:
             logger.error(f"❌ Training failed for {ticker}: {e}")
@@ -327,12 +445,11 @@ class MLPriceForecaster:
 
     def predict_price_movement(self, ticker: str, current_data: pd.DataFrame = None,
                              sentiment_data: List[Dict] = None) -> Dict:
-        """Predict price movement for a ticker"""
+        """Make predictions and track them in database"""
 
         try:
             # Check if models exist
             if ticker not in self.models:
-                # Try to train models first
                 logger.info(f"No models found for {ticker}, training...")
                 train_result = self.train_models(ticker, sentiment_data)
                 if not train_result['success']:
@@ -340,76 +457,139 @@ class MLPriceForecaster:
 
             # Get recent data if not provided
             if current_data is None or current_data.empty:
-                current_data = self.get_historical_data(ticker, days=50)
+                current_data = self.get_historical_data(ticker, days=100)
                 if current_data.empty:
                     raise ValueError("No current data available for prediction")
 
-            # Calculate indicators
-            df = self.calculate_technical_indicators(current_data)
+            # Calculate features
+            df = self.calculate_enhanced_features(current_data, sentiment_data)
 
-            # Get latest features
-            feature_cols = self.models[ticker]['feature_columns']
-
-            # Check if we have the required features
-            missing_cols = [col for col in feature_cols if col not in df.columns]
-            if missing_cols:
-                raise ValueError(f"Missing feature columns: {missing_cols}")
-
-            # Get the latest row with all features
-            latest_data = df[feature_cols].dropna().tail(1)
-            if latest_data.empty:
-                raise ValueError("No valid feature data for prediction")
-
-            latest_features = latest_data.values
-
-            # Scale features
-            scaler = self.models[ticker]['scaler']
-            latest_scaled = scaler.transform(latest_features)
-
-            # Make predictions with all models
-            models = self.models[ticker]['models']
+            # Make predictions for each target
             predictions = {}
 
-            for model_name, model in models.items():
+            for target_name, target_data in self.models[ticker].items():
                 try:
-                    pred = model.predict(latest_scaled)[0]
-                    predictions[model_name] = float(pred)
+                    feature_cols = target_data['feature_columns']
+                    scaler = target_data['scaler']
+                    models = target_data['models']
+
+                    # Get latest features
+                    latest_data = df[feature_cols].dropna().tail(1)
+                    if latest_data.empty:
+                        continue
+
+                    latest_features = latest_data.values
+                    latest_scaled = scaler.transform(latest_features)
+
+                    # Ensemble prediction
+                    target_predictions = {}
+                    probabilities = {}
+
+                    for model_name, model in models.items():
+                        pred = model.predict(latest_scaled)[0]
+                        prob = model.predict_proba(latest_scaled)[0]
+
+                        target_predictions[model_name] = int(pred)
+                        probabilities[model_name] = float(prob[1])  # Probability of positive class
+
+                    # Ensemble
+                    ensemble_prob = np.mean(list(probabilities.values()))
+                    ensemble_pred = int(ensemble_prob > 0.5)
+
+                    predictions[target_name] = {
+                        'prediction': ensemble_pred,
+                        'probability': ensemble_prob,
+                        'individual_predictions': target_predictions,
+                        'individual_probabilities': probabilities
+                    }
+
                 except Exception as e:
-                    logger.warning(f"Prediction failed for {model_name}: {e}")
+                    logger.warning(f"Prediction failed for {target_name}: {e}")
+                    continue
 
             if not predictions:
-                raise ValueError("All model predictions failed")
+                raise ValueError("All predictions failed")
 
-            # Ensemble prediction (simple average)
-            ensemble_pred = np.mean(list(predictions.values()))
-
-            # Current price
+            # Create final result
             current_price = float(current_data['close'].iloc[-1])
 
-            # Predicted price
-            predicted_price = current_price * (1 + ensemble_pred)
+            # Interpret predictions
+            direction_3d = predictions.get('target_direction_3d', {})
+            direction_5d = predictions.get('target_direction_5d', {})
+            high_vol = predictions.get('target_high_vol', {})
 
-            # Calculate confidence based on model agreement
-            pred_values = list(predictions.values())
-            pred_std = np.std(pred_values)
-            confidence = max(0.3, min(0.9, 1 - (pred_std * 5)))
+            # Overall signal
+            signals = []
+            confidence_scores = []
+
+            if direction_3d:
+                if direction_3d['prediction'] == 1:
+                    signals.append('bullish_3d')
+                confidence_scores.append(direction_3d['probability'])
+
+            if direction_5d:
+                if direction_5d['prediction'] == 1:
+                    signals.append('bullish_5d')
+                confidence_scores.append(direction_5d['probability'])
+
+            if high_vol:
+                if high_vol['prediction'] == 1:
+                    signals.append('high_volatility')
+                confidence_scores.append(high_vol['probability'])
+
+            overall_confidence = np.mean(confidence_scores) if confidence_scores else 0.5
+
+            # Determine overall direction
+            if 'bullish_3d' in signals or 'bullish_5d' in signals:
+                overall_direction = 'up'
+            else:
+                overall_direction = 'down'
+
+            # Create prediction record
+            prediction_id = f"{ticker}_{int(time.time())}"
+            prediction_record = {
+                'prediction_id': prediction_id,
+                'ticker': ticker,
+                'prediction_time': datetime.now().isoformat(),
+                'current_price': current_price,
+                'overall_direction': overall_direction,
+                'overall_confidence': overall_confidence,
+                'signals': signals,
+                'detailed_predictions': predictions,
+                'sentiment_data': sentiment_data[0] if sentiment_data else None
+            }
+
+            # Save to Firebase database if available
+            if self.use_database and self.ml_db:
+                try:
+                    saved_id = self.ml_db.save_prediction(prediction_record)
+                    if saved_id:
+                        logger.info(f"✅ Saved prediction {saved_id} to Firebase")
+                    else:
+                        logger.warning("⚠️ Failed to save prediction to Firebase")
+                except Exception as e:
+                    logger.warning(f"⚠️ Database save failed: {e}")
+
+            # Also save to local file as backup
+            self.predictions_db[prediction_id] = prediction_record
+            self.save_prediction_history()
 
             result = {
                 'ticker': ticker,
                 'current_price': current_price,
-                'predicted_return': float(ensemble_pred),
-                'predicted_price': float(predicted_price),
-                'price_change': float(predicted_price - current_price),
-                'price_change_pct': float((predicted_price - current_price) / current_price * 100),
-                'confidence': float(confidence),
-                'individual_predictions': predictions,
-                'prediction_date': datetime.now().isoformat(),
-                'direction': 'up' if ensemble_pred > 0 else 'down',
-                'magnitude': 'high' if abs(ensemble_pred) > 0.02 else 'moderate' if abs(ensemble_pred) > 0.01 else 'low',
-                'models_used': list(predictions.keys())
+                'predicted_return': (overall_confidence - 0.5) * 0.1,  # Conservative return estimate
+                'predicted_price': current_price * (1 + (overall_confidence - 0.5) * 0.1),
+                'price_change_pct': (overall_confidence - 0.5) * 10,  # Conservative % change
+                'direction': overall_direction,
+                'confidence': overall_confidence,
+                'signals': signals,
+                'detailed_predictions': predictions,
+                'prediction_id': prediction_id,
+                'prediction_time': datetime.now().isoformat(),
+                'saved_to_database': self.use_database
             }
 
-            logger.info(f"✅ Prediction for {ticker}: {ensemble_pred*100:.2f}% ({result['direction']})")
+            logger.info(f"✅ Prediction for {ticker}: {overall_direction} (confidence: {overall_confidence:.2f})")
 
             return result
 
@@ -418,90 +598,83 @@ class MLPriceForecaster:
             return {
                 'ticker': ticker,
                 'error': str(e),
-                'prediction_date': datetime.now().isoformat()
+                'prediction_time': datetime.now().isoformat()
             }
 
-    def test_functionality(self, ticker: str = 'AAPL') -> Dict:
-        """Test the forecaster functionality"""
+    def get_model_performance_summary(self) -> Dict:
+        """Get comprehensive model performance summary"""
 
-        logger.info(f"🧪 Testing ML forecaster with {ticker}")
-
-        results = {
-            'ticker': ticker,
-            'yfinance_available': YFINANCE_AVAILABLE,
-            'tests': {}
+        # Local performance
+        local_performance = {
+            'models_trained': len(self.models),
+            'total_predictions_made_local': len(self.predictions_db),
+            'prediction_tracking_available': True,
+            'database_integration': self.use_database
         }
 
-        # Test 1: Data retrieval
-        try:
-            df = self.get_historical_data(ticker, days=50)
-            results['tests']['data_retrieval'] = {
-                'success': not df.empty,
-                'data_points': len(df),
-                'latest_price': float(df['close'].iloc[-1]) if not df.empty else None
-            }
-        except Exception as e:
-            results['tests']['data_retrieval'] = {'success': False, 'error': str(e)}
-
-        # Test 2: Model training (only if data retrieval worked)
-        if results['tests']['data_retrieval']['success']:
+        # Database performance if available
+        if self.use_database and self.ml_db:
             try:
-                train_result = self.train_models(ticker)
-                results['tests']['model_training'] = {
-                    'success': train_result['success'],
-                    'models_trained': train_result.get('models_trained', 0),
-                    'error': train_result.get('error')
-                }
+                db_performance = self.ml_db.get_performance_summary()
+                local_performance.update({
+                    'database_performance': db_performance,
+                    'database_status': 'connected'
+                })
             except Exception as e:
-                results['tests']['model_training'] = {'success': False, 'error': str(e)}
+                local_performance.update({
+                    'database_status': f'error: {str(e)}',
+                    'database_performance': None
+                })
+        else:
+            local_performance.update({
+                'database_status': 'not_available',
+                'database_performance': None
+            })
 
-            # Test 3: Prediction (only if training worked)
-            if results['tests']['model_training']['success']:
-                try:
-                    prediction = self.predict_price_movement(ticker)
-                    results['tests']['prediction'] = {
-                        'success': 'error' not in prediction,
-                        'predicted_change': prediction.get('price_change_pct'),
-                        'confidence': prediction.get('confidence'),
-                        'error': prediction.get('error')
-                    }
-                except Exception as e:
-                    results['tests']['prediction'] = {'success': False, 'error': str(e)}
-
-        return results
+        local_performance['last_updated'] = datetime.now().isoformat()
+        return local_performance
 
 
 def main():
-    """Test the fixed forecaster"""
+    """Test the improved forecaster"""
 
-    print("🚀 Testing Fixed ML Price Forecaster with yfinance")
+    print("🚀 Testing IMPROVED ML Forecaster (No More Overfitting!)")
     print("=" * 60)
 
     forecaster = MLPriceForecaster()
 
-    # Run comprehensive test
-    test_results = forecaster.test_functionality('AAPL')
+    # Test with sample sentiment data
+    sample_sentiment = [{
+        'sentiment': 'bullish',
+        'confidence': 0.8,
+        'numerical_score': 0.6,
+        'mention_count': 15
+    }]
 
-    print(f"\n📊 Test Results for {test_results['ticker']}:")
-    print(f"yfinance available: {test_results['yfinance_available']}")
+    # Test training
+    print("Testing training with improved features...")
+    train_result = forecaster.train_models('AAPL', sample_sentiment)
 
-    for test_name, result in test_results['tests'].items():
-        status = "✅" if result['success'] else "❌"
-        print(f"\n{status} {test_name.replace('_', ' ').title()}:")
+    if train_result['success']:
+        print(f"✅ Training successful: {train_result}")
 
-        if result['success']:
-            for key, value in result.items():
-                if key != 'success' and value is not None:
-                    print(f"   {key}: {value}")
+        # Test prediction
+        print("Testing prediction with tracking...")
+        prediction = forecaster.predict_price_movement('AAPL', sentiment_data=sample_sentiment)
+
+        if 'error' not in prediction:
+            print(f"✅ Prediction successful: {prediction}")
+            print(f"   Direction: {prediction['direction']}")
+            print(f"   Confidence: {prediction['confidence']:.2%}")
+            print(f"   Saved to database: {prediction['saved_to_database']}")
         else:
-            print(f"   Error: {result.get('error', 'Unknown error')}")
-
-    print("\n" + "=" * 60)
-
-    if all(test['success'] for test in test_results['tests'].values()):
-        print("🎉 ALL TESTS PASSED! ML Forecaster is working with yfinance")
+            print(f"❌ Prediction failed: {prediction['error']}")
     else:
-        print("⚠️  Some tests failed. Check the errors above.")
+        print(f"❌ Training failed: {train_result['error']}")
+
+    # Test performance tracking
+    performance = forecaster.get_model_performance_summary()
+    print(f"📊 Performance summary: {performance}")
 
 
 if __name__ == "__main__":

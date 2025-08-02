@@ -1,6 +1,6 @@
 """
-Enhanced AI Trading Analyst
-Provides deep analysis of trading opportunities using LLM intelligence
+Enhanced AI Trading Analyst - UPDATED with ML Integration
+Provides deep analysis of trading opportunities using LLM intelligence + ML forecasting
 """
 
 import sys
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class EnhancedTradingAnalyst:
-    """Advanced AI analyst for trading opportunities"""
+    """Advanced AI analyst for trading opportunities with ML integration"""
 
     def __init__(self):
         """Initialize the enhanced trading analyst"""
@@ -41,6 +41,11 @@ class EnhancedTradingAnalyst:
         # Analysis cache to avoid repeated API calls
         self.analysis_cache = {}
         self.cache_duration = 1800  # 30 minutes
+
+        # Initialize ML forecaster if available
+        self.ml_forecaster = None
+        self.ml_available = False
+        self._initialize_ml_forecaster()
 
         logger.info("Enhanced Trading Analyst initialized")
 
@@ -59,6 +64,18 @@ class EnhancedTradingAnalyst:
             api_key = LLM_CONFIG['openai']['api_key']
             self.llm_client = openai.OpenAI(api_key=api_key)
             self.llm_model = LLM_CONFIG['openai']['model']
+
+    def _initialize_ml_forecaster(self):
+        """Initialize ML forecaster if available"""
+        try:
+            from ml.ml_price_forecaster import MLPriceForecaster
+            self.ml_forecaster = MLPriceForecaster()
+            self.ml_available = True
+            logger.info("✅ ML Price Forecaster integrated successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ ML Price Forecaster not available: {e}")
+            self.ml_forecaster = None
+            self.ml_available = False
 
     def get_enhanced_market_data(self, ticker: str) -> Dict:
         """Get comprehensive market data for a ticker"""
@@ -194,13 +211,51 @@ class EnhancedTradingAnalyst:
             logger.error(f"Error calculating technical indicators for {ticker}: {e}")
             return {}
 
+    def get_ml_forecast(self, ticker: str, sentiment_data: Dict) -> Dict:
+        """Get ML forecast for the ticker"""
+        if not self.ml_available or not self.ml_forecaster:
+            return {'error': 'ML forecaster not available'}
+
+        try:
+            logger.info(f"🤖 Getting ML forecast for {ticker}...")
+
+            # Make prediction with sentiment integration
+            prediction_result = self.ml_forecaster.predict_price_movement(
+                ticker=ticker,
+                current_data=None,  # Will fetch automatically
+                sentiment_data=[sentiment_data]
+            )
+
+            if 'error' not in prediction_result:
+                ml_forecast = {
+                    'direction': prediction_result['direction'],
+                    'confidence': prediction_result['confidence'],
+                    'price_change_pct': prediction_result.get('price_change_pct', 0),
+                    'predicted_price': prediction_result.get('predicted_price', 0),
+                    'predicted_return': prediction_result.get('predicted_return', 0),
+                    'signals': prediction_result.get('signals', []),
+                    'prediction_id': prediction_result.get('prediction_id'),
+                    'model_version': 'v2.0_improved',
+                    'saved_to_database': prediction_result.get('saved_to_database', False)
+                }
+                logger.info(f"✅ ML forecast: {prediction_result['direction']} ({prediction_result['confidence']:.2%})")
+                return ml_forecast
+            else:
+                logger.warning(f"⚠️ ML forecast failed: {prediction_result['error']}")
+                return {'error': prediction_result['error']}
+
+        except Exception as e:
+            logger.warning(f"⚠️ ML forecast exception: {e}")
+            return {'error': str(e)}
+
     def generate_enhanced_analysis(self,
                                    ticker: str,
                                    sentiment_data: Dict,
                                    market_data: Dict,
                                    technical_indicators: Dict,
-                                   reddit_mentions: List[Dict]) -> Dict:
-        """Generate comprehensive AI analysis of trading opportunity"""
+                                   reddit_mentions: List[Dict],
+                                   ml_forecast: Dict = None) -> Dict:
+        """Generate comprehensive AI analysis of trading opportunity with ML integration"""
 
         cache_key = f"analysis_{ticker}_{int(time.time() / self.cache_duration)}"
         if cache_key in self.analysis_cache:
@@ -235,6 +290,18 @@ class EnhancedTradingAnalyst:
             # Reddit sentiment context
             reddit_context = f"WSB mentions: {mention_count}, sentiment: {sentiment} (confidence: {confidence:.2f})"
 
+            # ML forecast context
+            ml_context = ""
+            if ml_forecast and 'error' not in ml_forecast:
+                ml_direction = ml_forecast.get('direction', 'unknown')
+                ml_confidence = ml_forecast.get('confidence', 0)
+                ml_change = ml_forecast.get('price_change_pct', 0)
+                ml_context = f"ML Model Prediction: {ml_direction} ({ml_confidence:.1%} confidence, {ml_change:+.1f}% expected change)"
+            elif ml_forecast:
+                ml_context = f"ML Model: {ml_forecast.get('error', 'unavailable')}"
+            else:
+                ml_context = "ML Model: not available"
+
             # Sample of recent mentions for context
             mention_samples = []
             for mention in reddit_mentions[:3]:
@@ -257,6 +324,9 @@ TECHNICAL ANALYSIS:
 
 REDDIT SENTIMENT:
 {reddit_context}
+
+ML FORECAST:
+{ml_context}
 
 RECENT NEWS:
 {news_context}
@@ -290,7 +360,12 @@ Provide a comprehensive trading analysis in this EXACT JSON format:
         "sentiment_quality": "high|medium|low",
         "contrarian_signal": true/false
     }},
-    "executive_summary": "2-3 sentence summary of the play"
+    "ml_integration": {{
+        "ml_direction_agreement": "agrees|disagrees|neutral",
+        "combined_confidence": 0.0-1.0,
+        "ml_sentiment_alignment": "aligned|conflicted|neutral"
+    }},
+    "executive_summary": "2-3 sentence summary of the play including ML insights"
 }}
 
 IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON.
@@ -302,7 +377,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
                     model=self.llm_model,
                     messages=[
                         {"role": "system",
-                         "content": "You are an expert quantitative trader and financial analyst. Provide detailed, actionable trading analysis. Return only valid JSON."},
+                         "content": "You are an expert quantitative trader and financial analyst with access to ML models. Provide detailed, actionable trading analysis that integrates ML predictions with fundamental and technical analysis. Return only valid JSON."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.1,
@@ -314,7 +389,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
                     model=self.llm_model,
                     messages=[
                         {"role": "system",
-                         "content": "You are an expert quantitative trader and financial analyst. Provide detailed, actionable trading analysis. Return only valid JSON."},
+                         "content": "You are an expert quantitative trader and financial analyst with access to ML models. Provide detailed, actionable trading analysis that integrates ML predictions with fundamental and technical analysis. Return only valid JSON."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.1,
@@ -346,7 +421,8 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
                 # Add metadata
                 analysis['ticker'] = ticker
                 analysis['analysis_timestamp'] = datetime.now(timezone.utc).isoformat()
-                analysis['data_sources'] = ['reddit_sentiment', 'market_data', 'technical_analysis', 'recent_news']
+                analysis['data_sources'] = ['reddit_sentiment', 'market_data', 'technical_analysis', 'recent_news', 'ml_forecast']
+                analysis['ml_forecast_available'] = ml_forecast is not None and 'error' not in ml_forecast
 
                 # Cache the result
                 self.analysis_cache[cache_key] = analysis
@@ -384,6 +460,11 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
                     'sentiment_quality': 'medium',
                     'contrarian_signal': False
                 },
+                'ml_integration': {
+                    'ml_direction_agreement': 'neutral',
+                    'combined_confidence': 0.5,
+                    'ml_sentiment_alignment': 'neutral'
+                },
                 'executive_summary': f"Basic analysis for {ticker} based on {sentiment} sentiment",
                 'analysis_timestamp': datetime.now(timezone.utc).isoformat(),
                 'error': str(e)
@@ -393,7 +474,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
                                     ticker: str,
                                     sentiment_data: Dict,
                                     reddit_mentions: List[Dict] = None) -> Dict:
-        """Complete analysis of a trading opportunity"""
+        """Complete analysis of a trading opportunity with ML integration"""
 
         logger.info(f"Starting enhanced analysis for {ticker}")
 
@@ -404,7 +485,10 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
             # Calculate technical indicators
             technical_indicators = self.calculate_technical_indicators(ticker)
 
-            # Generate AI analysis
+            # Get ML forecast
+            ml_forecast = self.get_ml_forecast(ticker, sentiment_data)
+
+            # Generate AI analysis with ML integration
             if reddit_mentions is None:
                 reddit_mentions = []
 
@@ -413,8 +497,12 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
                 sentiment_data=sentiment_data,
                 market_data=market_data,
                 technical_indicators=technical_indicators,
-                reddit_mentions=reddit_mentions
+                reddit_mentions=reddit_mentions,
+                ml_forecast=ml_forecast
             )
+
+            # Add ML forecast to the analysis output
+            enhanced_analysis['ml_forecast'] = ml_forecast
 
             # Add raw data for reference
             enhanced_analysis['raw_data'] = {
@@ -437,7 +525,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
             }
 
     def batch_analyze_opportunities(self, opportunities: List[Dict]) -> List[Dict]:
-        """Analyze multiple trading opportunities"""
+        """Analyze multiple trading opportunities with ML integration"""
 
         enhanced_opportunities = []
 
@@ -457,7 +545,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
                     'numerical_score': opp.get('numerical_score', 0)
                 }
 
-                # Get enhanced analysis
+                # Get enhanced analysis with ML
                 analysis = self.analyze_trading_opportunity(
                     ticker=ticker,
                     sentiment_data=sentiment_data
@@ -478,7 +566,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON
 
 
 def main():
-    """Test the enhanced trading analyst"""
+    """Test the enhanced trading analyst with ML integration"""
     analyst = EnhancedTradingAnalyst()
 
     # Test analysis
@@ -494,7 +582,7 @@ def main():
         {'text': 'Tesla delivery numbers beat expectations', 'score': 89}
     ]
 
-    print("🤖 Testing Enhanced Trading Analyst...")
+    print("🤖 Testing Enhanced Trading Analyst with ML Integration...")
     analysis = analyst.analyze_trading_opportunity('TSLA', test_sentiment, test_mentions)
 
     print(f"\n📊 Analysis Results:")
@@ -502,6 +590,14 @@ def main():
     print(f"Confidence: {analysis.get('confidence_score', 0):.2f}")
     print(f"Target: ${analysis.get('target_price', 0):.2f}")
     print(f"Strategy: {analysis.get('options_strategy', {}).get('recommended_play', 'N/A')}")
+    print(f"ML Available: {analysis.get('ml_forecast_available', False)}")
+
+    if 'ml_forecast' in analysis and 'error' not in analysis['ml_forecast']:
+        ml_forecast = analysis['ml_forecast']
+        print(f"ML Direction: {ml_forecast.get('direction', 'N/A')}")
+        print(f"ML Confidence: {ml_forecast.get('confidence', 0):.2%}")
+        print(f"Prediction ID: {ml_forecast.get('prediction_id', 'N/A')}")
+
     print(f"Summary: {analysis.get('executive_summary', 'N/A')}")
 
 
