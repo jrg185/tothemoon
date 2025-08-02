@@ -22,6 +22,10 @@ torch
 scikit-learn
 xgboost
 lightgbm
+torch
+numpy
+scipy
+plotly
 
 # Database - Firebase
 firebase-admin
