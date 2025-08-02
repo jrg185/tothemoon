@@ -1,5 +1,5 @@
 """
-Ultra-Optimized Trading Dashboard - Reduces Firebase reads from 49K to <50 per day
+WSB Options Trading Dashboard - Focused on Trading Intelligence
 """
 
 import sys
@@ -19,20 +19,19 @@ import time
 import requests
 from typing import Dict, List, Optional
 
-# Use ultra-optimized Firebase manager
 from data.firebase_manager import FirebaseManager
 from config.settings import APP_CONFIG, FINANCIAL_APIS
 import numpy as np
 
 # Configure Streamlit
 st.set_page_config(
-    page_title="WSB Options Trader - Ultra Optimized",
+    page_title="WSB Options Trader",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Enhanced CSS with quota optimization notices
+# Enhanced CSS focused on trading intelligence
 st.markdown("""
 <style>
     .main-header {
@@ -41,15 +40,6 @@ st.markdown("""
         text-align: center;
         margin-bottom: 1rem;
         font-weight: bold;
-    }
-    
-    .quota-optimization {
-        background: linear-gradient(135deg, #1a4d1a, #2d6d2d);
-        border: 2px solid #4CAF50;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 20px 0;
-        text-align: center;
     }
     
     .hot-stock {
@@ -88,14 +78,6 @@ st.markdown("""
         margin: 5px 0;
     }
     
-    .alert-box {
-        background-color: #2D1B00;
-        border: 2px solid #FF8C00;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 10px 0;
-    }
-    
     .ticker-item {
         background-color: #1E1E1E;
         padding: 0.5rem;
@@ -113,34 +95,26 @@ st.markdown("""
         color: #888;
         margin: 5px 0;
     }
-    
-    .quota-status {
-        background-color: #1a1a2e;
-        padding: 10px;
-        border-radius: 8px;
-        border-left: 4px solid #00FF88;
-        margin: 10px 0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 
-class UltraOptimizedTradingDashboard:
-    """Ultra-optimized trading dashboard - reduces from 49K to <50 Firebase reads/day"""
+class TradingDashboard:
+    """WSB Options Trading Dashboard focused on trading intelligence"""
 
     def __init__(self):
         self.firebase_manager = FirebaseManager()
         self.alpha_vantage_key = FINANCIAL_APIS.get('alpha_vantage')
         self.finnhub_key = FINANCIAL_APIS.get('finnhub')
 
-        # Rate limiting for price API calls (keep existing)
+        # Rate limiting for price API calls
         self.price_cache = {}
-        self.price_cache_duration = 600  # Increased to 10 minutes (was 5)
+        self.price_cache_duration = 300  # 5 minutes
         self.last_price_requests = {}
 
     def get_stock_price_data(self, ticker: str) -> dict:
-        """Get current price data with extended caching"""
-        # Check cache first (extended duration)
+        """Get current price data with caching"""
+        # Check cache first
         cache_key = ticker.upper()
         current_time = time.time()
 
@@ -148,9 +122,9 @@ class UltraOptimizedTradingDashboard:
             current_time - self.price_cache[cache_key]['timestamp'] < self.price_cache_duration):
             return self.price_cache[cache_key]['data']
 
-        # Rate limiting - max 1 request per ticker per 60 seconds (was 30)
+        # Rate limiting - max 1 request per ticker per 30 seconds
         if (cache_key in self.last_price_requests and
-            current_time - self.last_price_requests[cache_key] < 60):
+            current_time - self.last_price_requests[cache_key] < 30):
             return self._get_default_price_data()
 
         try:
@@ -173,7 +147,7 @@ class UltraOptimizedTradingDashboard:
                     'prev_close': data.get('pc') or 0
                 }
 
-                # Cache the result for 10 minutes
+                # Cache the result
                 self.price_cache[cache_key] = {
                     'data': price_data,
                     'timestamp': current_time
@@ -199,27 +173,26 @@ class UltraOptimizedTradingDashboard:
             'prev_close': 0
         }
 
-    @st.cache_data(ttl=1800)  # Increased cache to 30 minutes (was 5)
+    @st.cache_data(ttl=300)  # 5 minute cache
     def get_trading_opportunities(_self):
-        """Get comprehensive trading data with ULTRA-AGGRESSIVE caching"""
+        """Get comprehensive trading data"""
         try:
-            # Use ultra-optimized Firebase manager
             fm = _self.firebase_manager
 
-            # Get data with MUCH smaller limits and 1-hour caching
-            recent_posts = fm.get_recent_posts(limit=30, hours=24, use_cache=True)  # REDUCED from 200 to 30
+            # Get data with reasonable limits
+            recent_posts = fm.get_recent_posts(limit=200, hours=24, use_cache=True)
             trending_24h = fm.get_trending_tickers(hours=24, min_mentions=2, use_cache=True)
             trending_1h = fm.get_trending_tickers(hours=1, min_mentions=1, use_cache=True)
             sentiment_overview = fm.get_sentiment_overview(hours=24, use_cache=True)
 
-            # Process only top 10 opportunities to reduce price API calls (was 20)
+            # Process top opportunities
             enhanced_opportunities = []
-            top_sentiment_items = sentiment_overview[:10]
+            top_sentiment_items = sentiment_overview[:20]
 
             for sentiment_item in top_sentiment_items:
                 ticker = sentiment_item.get('ticker')
                 if ticker:
-                    # Get price data (with extended caching)
+                    # Get price data
                     price_data = _self.get_stock_price_data(ticker)
 
                     # Find in trending data
@@ -255,7 +228,7 @@ class UltraOptimizedTradingDashboard:
                 'bullish_plays': [op for op in enhanced_opportunities if op['sentiment'] == 'bullish' and op['confidence'] > 0.5],
                 'bearish_plays': [op for op in enhanced_opportunities if op['sentiment'] == 'bearish' and op['confidence'] > 0.5],
                 'momentum_plays': [op for op in enhanced_opportunities if op['mention_count_1h'] > 0 or abs(op['change_percent']) > 1],
-                'recent_posts': recent_posts[:15],  # REDUCED from 50 to 15
+                'recent_posts': recent_posts[:25],
                 'cache_info': fm.get_cache_stats(),
                 'quota_status': fm.get_quota_status()
             }
@@ -275,7 +248,7 @@ class UltraOptimizedTradingDashboard:
             }
 
     def calculate_opportunity_score(self, sentiment_data, price_data, trending_data, recent_trending):
-        """Calculate a trading opportunity score (0-100) - unchanged"""
+        """Calculate a trading opportunity score (0-100)"""
         score = 0
 
         try:
@@ -317,59 +290,8 @@ class UltraOptimizedTradingDashboard:
 
         return min(score, 100)
 
-    def render_quota_optimization_notice(self, quota_status: Dict):
-        """Show quota optimization status"""
-        reads_today = quota_status.get('reads_today', 0)
-        daily_limit = quota_status.get('daily_limit', 50)
-        quota_healthy = quota_status.get('quota_healthy', True)
-
-        if quota_healthy:
-            st.markdown(f"""
-            <div class="quota-optimization">
-            <h3>⚡ ULTRA-OPTIMIZED: Quota Crisis SOLVED!</h3>
-            <p><strong>Today's Firebase Reads:</strong> {reads_today}/{daily_limit} (Target: <50/day)</p>
-            <p><strong>Previous Issue:</strong> You used 49,000 reads/day</p>
-            <p><strong>Optimization:</strong> 99.9% reduction achieved with 1-hour caching!</p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div class="alert-box">
-            <h3>⚠️ Approaching Daily Limit</h3>
-            <p><strong>Today's Firebase Reads:</strong> {reads_today}/{daily_limit}</p>
-            <p>Using cached data to prevent quota exceeded errors.</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-    def render_cache_info(self, cache_info: Dict, quota_status: Dict):
-        """Render enhanced cache and quota information"""
-        if cache_info or quota_status:
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.markdown("### 💾 Cache Status")
-                if cache_info:
-                    st.markdown(f"""
-                    <div class="cache-info">
-                    📊 <strong>Valid Cached Queries:</strong> {cache_info.get('valid_cached_queries', 0)}<br>
-                    ⏱️ <strong>Cache Duration:</strong> {cache_info.get('cache_duration_minutes', 0):.0f} minutes<br>
-                    💾 <strong>Total Cached:</strong> {cache_info.get('total_cached_queries', 0)} queries
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            with col2:
-                st.markdown("### 🔥 Firebase Quota")
-                if quota_status:
-                    st.markdown(f"""
-                    <div class="quota-status">
-                    📈 <strong>Reads This Hour:</strong> {quota_status.get('reads_this_hour', 0)}/{quota_status.get('hourly_limit', 5)}<br>
-                    📊 <strong>Reads Today:</strong> {quota_status.get('reads_today', 0)}/{quota_status.get('daily_limit', 50)}<br>
-                    ✅ <strong>Status:</strong> {'Healthy' if quota_status.get('quota_healthy', True) else 'Near Limit'}
-                    </div>
-                    """, unsafe_allow_html=True)
-
     def render_hot_opportunities(self, data):
-        """Render top trading opportunities - unchanged"""
+        """Render top trading opportunities"""
         st.markdown("## 🔥 Hot Trading Opportunities")
 
         hot_stocks = data['hot_stocks'][:6]
@@ -418,7 +340,7 @@ class UltraOptimizedTradingDashboard:
                 """, unsafe_allow_html=True)
 
     def render_trading_metrics(self, data):
-        """Render key trading metrics - unchanged"""
+        """Render key trading metrics"""
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
@@ -437,7 +359,7 @@ class UltraOptimizedTradingDashboard:
             st.metric("⚡ Momentum Plays", momentum_count)
 
     def render_options_opportunities(self, data):
-        """Render specific options trading opportunities - unchanged"""
+        """Render specific options trading opportunities"""
         st.markdown("## 💰 Options Trading Opportunities")
 
         # Separate into calls and puts
@@ -481,18 +403,18 @@ class UltraOptimizedTradingDashboard:
                 st.info("No high-confidence bearish plays found")
 
     def render_recent_posts(self, data):
-        """Render recent posts with tickers - REDUCED display count"""
+        """Render recent posts with tickers"""
         st.markdown("## 📋 Recent WSB Activity")
 
         recent_posts = data.get('recent_posts', [])
 
         if recent_posts:
-            # Show only top 10 most recent posts with tickers (was 15)
+            # Show recent posts with tickers
             ticker_posts = [post for post in recent_posts if post.get('tickers')]
             ticker_posts.sort(key=lambda x: x.get('created_utc', 0), reverse=True)
 
             if ticker_posts:
-                for i, post in enumerate(ticker_posts[:10]):  # REDUCED from 15 to 10
+                for i, post in enumerate(ticker_posts[:15]):
                     timestamp = datetime.fromtimestamp(post.get('created_utc', 0), tz=timezone.utc)
                     time_ago = datetime.now(timezone.utc) - timestamp
 
@@ -526,38 +448,22 @@ class UltraOptimizedTradingDashboard:
             st.info("🔍 No recent posts available")
 
     def render_sidebar(self, data):
-        """Render optimized sidebar with quota management"""
-        st.sidebar.markdown("## 💰 Ultra-Optimized Control Panel")
+        """Render sidebar"""
+        st.sidebar.markdown("## 💰 Trading Control Panel")
 
-        # Quota status
-        quota_status = data.get('quota_status', {})
-        if quota_status:
-            reads_today = quota_status.get('reads_today', 0)
-            daily_limit = quota_status.get('daily_limit', 50)
-            quota_healthy = quota_status.get('quota_healthy', True)
-
-            st.sidebar.markdown("### 🔥 Firebase Quota")
-            if quota_healthy:
-                st.sidebar.success(f"✅ Quota Healthy: {reads_today}/{daily_limit} reads today")
-            else:
-                st.sidebar.error(f"⚠️ Near Limit: {reads_today}/{daily_limit} reads today")
-
-            # Progress bar
-            progress = min(reads_today / daily_limit, 1.0)
-            st.sidebar.progress(progress)
-
-        # Auto-refresh with MUCH longer intervals
+        # Auto-refresh options
         refresh_options = {
             "Disabled": 0,
-            "Every 30 minutes": 1800,  # Increased minimum interval
-            "Every 1 hour": 3600,     # Most common option
-            "Every 2 hours": 7200     # Maximum interval
+            "Every 5 minutes": 300,
+            "Every 15 minutes": 900,
+            "Every 30 minutes": 1800,
+            "Every 1 hour": 3600
         }
 
         selected_refresh = st.sidebar.selectbox(
             "🔄 Auto-refresh interval",
             list(refresh_options.keys()),
-            index=0  # Default to disabled
+            index=0
         )
 
         auto_refresh_seconds = refresh_options[selected_refresh]
@@ -579,14 +485,18 @@ class UltraOptimizedTradingDashboard:
 
         st.sidebar.markdown("---")
 
-        # Cache information
-        cache_info = data.get('cache_info', {})
-        if cache_info:
-            st.sidebar.markdown("### 📊 Cache System")
-            valid_queries = cache_info.get('valid_cached_queries', 0)
-            total_queries = cache_info.get('total_cached_queries', 0)
-            st.sidebar.metric("Valid Cache Entries", f"{valid_queries}/{total_queries}")
-            st.sidebar.metric("Cache Duration", f"{cache_info.get('cache_duration_minutes', 0):.0f} min")
+        # Firebase status (simplified)
+        quota_status = data.get('quota_status', {})
+        if quota_status:
+            reads_today = quota_status.get('reads_today', 0)
+            daily_limit = quota_status.get('daily_limit', 35000)
+
+            st.sidebar.markdown("### 📊 System Status")
+            st.sidebar.metric("Firebase Reads Today", f"{reads_today:,}")
+            st.sidebar.metric("Daily Limit", f"{daily_limit:,}")
+
+            usage_percent = (reads_today / daily_limit) * 100
+            st.sidebar.progress(usage_percent / 100)
 
         st.sidebar.markdown("---")
 
@@ -597,29 +507,16 @@ class UltraOptimizedTradingDashboard:
         st.sidebar.metric("Bullish Sentiment", len(data['bullish_plays']))
         st.sidebar.metric("Bearish Sentiment", len(data['bearish_plays']))
 
-        # Optimization achievements
-        st.sidebar.markdown("### ⚡ Optimization Results")
-        st.sidebar.metric("Previous Daily Reads", "49,000")
-        st.sidebar.metric("Current Daily Target", "<50")
-        reduction_percentage = ((49000 - 50) / 49000) * 100
-        st.sidebar.metric("Quota Reduction", f"{reduction_percentage:.1f}%")
-
         return auto_refresh_seconds
 
     def run(self):
         """Main dashboard run function"""
         # Header
-        st.markdown('<h1 class="main-header">💰 WSB Options Trader - Ultra Optimized</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 class="main-header">💰 WSB Options Trader</h1>', unsafe_allow_html=True)
 
-        # Get trading data (30-minute cached)
-        with st.spinner("Loading trading opportunities (cached for efficiency)..."):
+        # Get trading data
+        with st.spinner("Loading trading opportunities..."):
             data = self.get_trading_opportunities()
-
-        # Show quota optimization notice
-        self.render_quota_optimization_notice(data.get('quota_status', {}))
-
-        # Render enhanced cache and quota info
-        self.render_cache_info(data.get('cache_info', {}), data.get('quota_status', {}))
 
         # Render sidebar
         auto_refresh_seconds = self.render_sidebar(data)
@@ -640,13 +537,12 @@ class UltraOptimizedTradingDashboard:
         st.markdown("---")
         st.markdown("""
         <div style='text-align: center; color: #666;'>
-        ⚡ Ultra-Optimized WSB Intelligence • 💾 1-Hour Caching • 🔥 <50 Firebase reads/day<br>
-        <strong>Quota Crisis SOLVED:</strong> 49,000 → <50 reads/day (99.9% reduction)<br>
+        💰 WSB Options Trading Intelligence • 📊 Real-time Sentiment Analysis<br>
         ⚠️ Not financial advice. Trade at your own risk.
         </div>
         """, unsafe_allow_html=True)
 
-        # Auto-refresh with much longer intervals
+        # Auto-refresh
         if auto_refresh_seconds > 0:
             time.sleep(auto_refresh_seconds)
             st.rerun()
@@ -654,7 +550,7 @@ class UltraOptimizedTradingDashboard:
 
 def main():
     """Main function"""
-    dashboard = UltraOptimizedTradingDashboard()
+    dashboard = TradingDashboard()
     dashboard.run()
 
 

@@ -1,6 +1,6 @@
 """
-Ultra-Optimized Continuous Reddit Scraper
-Reduces Firebase writes from excessive levels to sustainable amounts
+Continuous Reddit Scraper with Realistic Resource Usage
+Uses reasonable Firebase limits while maintaining efficiency
 """
 
 import sys
@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, List
 from data import RedditScraper
-from data.firebase_manager import FirebaseManager  # Uses ultra-optimized manager
+from data.firebase_manager import FirebaseManager
 from processing.sentiment_analyzer import FinancialSentimentAnalyzer
 from config.settings import APP_CONFIG
 
@@ -32,18 +32,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class UltraOptimizedContinuousRedditScraper:
-    """Ultra-optimized continuous scraper - dramatically reduced Firebase usage"""
+class ContinuousRedditScraper:
+    """Continuous scraper with realistic resource usage"""
 
     def __init__(self):
-        """Initialize ultra-optimized continuous scraper"""
+        """Initialize continuous scraper"""
         # Use singleton Firebase manager to avoid repeated connections
         self.firebase_manager = FirebaseManager()
         self.sentiment_analyzer = FinancialSentimentAnalyzer()
 
-        # Initialize Reddit scraper (will reuse our Firebase manager)
+        # Initialize Reddit scraper
         self.scraper = RedditScraper()
-        self.scraper.firebase_manager = self.firebase_manager  # Reuse connection
+        self.scraper.firebase_manager = self.firebase_manager
 
         # Statistics
         self.total_posts_scraped = 0
@@ -51,15 +51,15 @@ class UltraOptimizedContinuousRedditScraper:
         self.total_tickers_found = set()
         self.start_time = datetime.now(timezone.utc)
 
-        # ULTRA-AGGRESSIVE deduplication cache to avoid processing same posts
+        # Reasonable deduplication cache
         self.processed_posts = set()
         self.processed_comments = set()
 
-        # Last scrape tracking to avoid frequent cycles
+        # Cycle timing - reasonable intervals
         self.last_scrape_time = 0
-        self.min_cycle_interval = 3600  # MINIMUM 1 hour between cycles (was 15 minutes)
+        self.min_cycle_interval = 1800  # 30 minutes between cycles (reasonable)
 
-        logger.info("🚀 ULTRA-Optimized Continuous Reddit Scraper initialized")
+        logger.info("🚀 Continuous Reddit Scraper initialized with realistic limits")
 
     def should_run_cycle(self) -> bool:
         """Check if enough time has passed since last cycle"""
@@ -68,125 +68,130 @@ class UltraOptimizedContinuousRedditScraper:
 
         if time_since_last < self.min_cycle_interval:
             remaining = self.min_cycle_interval - time_since_last
-            logger.info(f"⏳ Skipping cycle - {remaining/60:.1f} minutes remaining until next allowed cycle")
+            logger.info(f"⏳ Next cycle in {remaining/60:.1f} minutes")
             return False
 
-        # Check Firebase quota before proceeding
+        # Check Firebase quota (but with realistic limits)
         quota_status = self.firebase_manager.get_quota_status()
-        if not quota_status.get('quota_healthy', True):
-            logger.warning("🚨 Firebase quota near limit - skipping scrape cycle")
+        reads_today = quota_status.get('reads_today', 0)
+        daily_limit = quota_status.get('daily_limit', 35000)
+
+        # Only skip if we're actually near the limit (not ultra-conservative)
+        if reads_today >= daily_limit * 0.9:  # 90% of limit
+            logger.warning(f"🚨 Firebase quota at 90% ({reads_today}/{daily_limit}) - skipping cycle")
             return False
 
         return True
 
     def scrape_cycle(self) -> Dict:
-        """Execute one ULTRA-CONSERVATIVE scraping cycle"""
+        """Execute one scraping cycle with reasonable limits"""
         if not self.should_run_cycle():
-            return {'skipped': 'Too soon or quota limits'}
+            return {'skipped': 'Too soon or approaching quota limits'}
 
         cycle_start = time.time()
-        logger.info("🔄 Starting ULTRA-CONSERVATIVE scraping cycle...")
+        logger.info("🔄 Starting scraping cycle...")
 
         try:
-            # Phase 1: DRAMATICALLY reduced scraping limits
+            # Phase 1: Reasonable scraping limits
             all_posts_data = []
             all_comments_data = []
 
-            # ULTRA-REDUCED limits to minimize Reddit API calls
-            hot_posts = self.scraper.scrape_posts(sort_type='hot', limit=8)    # REDUCED from 15 to 8
+            # Get posts from multiple sources with reasonable limits
+            hot_posts = self.scraper.scrape_posts(sort_type='hot', limit=25)
             all_posts_data.extend(hot_posts)
             logger.info(f"📈 Hot posts: {len(hot_posts)}")
 
-            new_posts = self.scraper.scrape_posts(sort_type='new', limit=5)    # REDUCED from 10 to 5
+            new_posts = self.scraper.scrape_posts(sort_type='new', limit=15)
             all_posts_data.extend(new_posts)
             logger.info(f"🆕 New posts: {len(new_posts)}")
 
-            # Skip rising posts to reduce API calls further
-            # rising_posts = self.scraper.scrape_posts(sort_type='rising', limit=8)
-            # all_posts_data.extend(rising_posts)
-            # logger.info(f"📊 Rising posts: {len(rising_posts)}")
+            rising_posts = self.scraper.scrape_posts(sort_type='rising', limit=10)
+            all_posts_data.extend(rising_posts)
+            logger.info(f"📊 Rising posts: {len(rising_posts)}")
 
-            # AGGRESSIVE deduplication and filtering
+            # Smart deduplication - keep posts we haven't seen with tickers
             unique_posts = {}
             new_posts_count = 0
 
             for post in all_posts_data:
                 post_id = post['id']
-                # Only process posts we haven't seen AND that have tickers
+                # Process posts we haven't seen that have tickers OR high scores
                 if (post_id not in unique_posts and
                     post_id not in self.processed_posts and
-                    len(post.get('tickers', [])) > 0):  # ONLY posts with tickers
+                    (len(post.get('tickers', [])) > 0 or post.get('score', 0) > 100)):
                     unique_posts[post_id] = post
                     new_posts_count += 1
 
             final_posts = list(unique_posts.values())
-            logger.info(f"📝 New posts with tickers to process: {new_posts_count}")
+            logger.info(f"📝 New posts to process: {new_posts_count}")
 
-            # Phase 2: ULTRA-CONSERVATIVE comment scraping
-            # Only scrape comments from posts with multiple tickers (high value)
+            # Phase 2: Reasonable comment scraping
+            # Focus on posts with multiple tickers or high engagement
             high_value_posts = [
                 post for post in final_posts
-                if len(post.get('tickers', [])) >= 2 and post.get('num_comments', 0) > 10
+                if (len(post.get('tickers', [])) >= 1 and
+                    post.get('num_comments', 0) > 5 and
+                    post.get('score', 0) > 50)
             ]
 
-            # Sort by engagement and limit to top posts
+            # Sort by engagement and limit reasonably
             high_value_posts.sort(
-                key=lambda x: (len(x.get('tickers', [])), x.get('num_comments', 0)),
+                key=lambda x: (len(x.get('tickers', [])), x.get('num_comments', 0), x.get('score', 0)),
                 reverse=True
             )
 
-            # DRASTICALLY reduce comment scraping to save quota
-            comments_target_posts = high_value_posts[:3]  # REDUCED from 5 to 3
+            # Get comments from top posts
+            comments_target_posts = high_value_posts[:8]  # Reasonable number
 
             for post in comments_target_posts:
                 try:
                     post_comments = self.scraper.scrape_comments(
                         post['id'],
-                        limit=15  # REDUCED from 20 to 15
+                        limit=25  # Reasonable comment limit
                     )
 
-                    # Filter out already processed comments AND require tickers
+                    # Filter for new comments with tickers or high scores
                     new_comments = [
                         comment for comment in post_comments
                         if (comment['id'] not in self.processed_comments and
-                            len(comment.get('tickers', [])) > 0)  # ONLY comments with tickers
+                            (len(comment.get('tickers', [])) > 0 or comment.get('score', 0) > 10))
                     ]
 
                     all_comments_data.extend(new_comments)
-                    logger.info(f"💬 Post {post['id']}: {len(new_comments)} new comments with tickers")
+                    logger.info(f"💬 Post {post['id']}: {len(new_comments)} new quality comments")
 
-                    # Longer pause to be respectful
-                    time.sleep(3)  # INCREASED from 1 to 3 seconds
+                    # Reasonable pause
+                    time.sleep(2)
 
                 except Exception as e:
                     logger.warning(f"Failed to scrape comments for {post['id']}: {e}")
                     continue
 
-            # Phase 3: ULTRA-SELECTIVE Sentiment Analysis
+            # Phase 3: Smart Sentiment Analysis
             sentiment_data = []
             ticker_sentiment_summary = {}
 
             if final_posts or all_comments_data:
-                logger.info("🧠 Starting ULTRA-SELECTIVE sentiment analysis...")
+                logger.info("🧠 Starting sentiment analysis...")
 
                 # Combine content for analysis
                 all_content = final_posts + all_comments_data
 
-                # Get unique tickers, but ONLY the most significant ones
+                # Get significant tickers (reasonable threshold)
                 ticker_counts = {}
                 for item in all_content:
                     for ticker in item.get('tickers', []):
                         ticker_counts[ticker] = ticker_counts.get(ticker, 0) + 1
 
-                # ULTRA-SELECTIVE: Only analyze tickers with 3+ mentions (was 2+)
+                # Focus on tickers with 2+ mentions (reasonable threshold)
                 significant_tickers = [
                     ticker for ticker, count in ticker_counts.items()
-                    if count >= 3
-                ][:10]  # Limit to top 10 tickers (was 15)
+                    if count >= 2
+                ][:20]  # Reasonable limit
 
-                logger.info(f"🎯 Analyzing sentiment for {len(significant_tickers)} HIGHLY significant tickers")
+                logger.info(f"🎯 Analyzing sentiment for {len(significant_tickers)} significant tickers")
 
-                # Analyze sentiment for only the most significant tickers
+                # Analyze sentiment for significant tickers
                 for ticker in significant_tickers:
                     try:
                         ticker_sentiment = self.sentiment_analyzer.analyze_ticker_sentiment(
@@ -213,9 +218,9 @@ class UltraOptimizedContinuousRedditScraper:
                         logger.warning(f"Sentiment analysis failed for {ticker}: {e}")
                         continue
 
-            # Phase 4: CONSERVATIVE Firebase saving
+            # Phase 4: Save to Firebase
             if final_posts or all_comments_data:
-                # Save using optimized batch saving with aggressive deduplication
+                # Save using batch operations
                 if final_posts:
                     saved_posts = self.firebase_manager.batch_save(
                         'reddit_posts',
@@ -237,17 +242,17 @@ class UltraOptimizedContinuousRedditScraper:
                     saved_sentiment = self.firebase_manager.save_sentiment_analysis(sentiment_data)
                     logger.info(f"💾 Saved sentiment analysis for {saved_sentiment} tickers")
 
-                # Update processed caches with LARGER limits
+                # Update processed caches with reasonable limits
                 for post in final_posts:
                     self.processed_posts.add(post['id'])
                 for comment in all_comments_data:
                     self.processed_comments.add(comment['id'])
 
-                # Keep cache sizes manageable but larger
-                if len(self.processed_posts) > 10000:  # INCREASED from 5000
-                    self.processed_posts = set(list(self.processed_posts)[-5000:])
-                if len(self.processed_comments) > 20000:  # INCREASED from 10000
-                    self.processed_comments = set(list(self.processed_comments)[-10000:])
+                # Keep cache sizes reasonable
+                if len(self.processed_posts) > 15000:
+                    self.processed_posts = set(list(self.processed_posts)[-7500:])
+                if len(self.processed_comments) > 30000:
+                    self.processed_comments = set(list(self.processed_comments)[-15000:])
 
                 # Update statistics
                 self.total_posts_scraped += len(final_posts)
@@ -292,30 +297,29 @@ class UltraOptimizedContinuousRedditScraper:
                     'quota_status': self.firebase_manager.get_quota_status()
                 }
 
-                logger.info(f"✅ ULTRA-CONSERVATIVE cycle complete: {len(final_posts)} posts, {len(all_comments_data)} comments")
+                logger.info(f"✅ Cycle complete: {len(final_posts)} posts, {len(all_comments_data)} comments")
                 logger.info(f"🎯 Tickers found: {list(cycle_tickers)}")
                 logger.info(f"📊 Sentiment: 🐂{len(bullish_tickers)} bullish, 🐻{len(bearish_tickers)} bearish")
-                logger.info(f"🔥 Quota status: {stats['quota_status']}")
 
                 return stats
 
             else:
-                logger.warning("No new high-value posts to process in this cycle")
-                return {'info': 'No new high-value posts processed'}
+                logger.info("No new valuable posts to process in this cycle")
+                return {'info': 'No new valuable posts processed'}
 
         except Exception as e:
-            logger.error(f"❌ ULTRA-CONSERVATIVE scraping cycle failed: {e}")
+            logger.error(f"❌ Scraping cycle failed: {e}")
             return {'error': str(e)}
 
     def cleanup_old_data(self):
-        """Clean up old data with CONSERVATIVE deletion"""
+        """Clean up old data reasonably"""
         try:
-            # Delete data older than 5 days (was 7 days) with smaller batches
-            deleted_posts = self.firebase_manager.delete_old_data('reddit_posts', days=5)
-            deleted_comments = self.firebase_manager.delete_old_data('reddit_posts_comments', days=5)
-            deleted_sentiment = self.firebase_manager.delete_old_data('sentiment_analysis', days=5)
+            # Delete data older than 7 days (reasonable retention)
+            deleted_posts = self.firebase_manager.delete_old_data('reddit_posts', days=7)
+            deleted_comments = self.firebase_manager.delete_old_data('reddit_posts_comments', days=7)
+            deleted_sentiment = self.firebase_manager.delete_old_data('sentiment_analysis', days=7)
 
-            logger.info(f"🗑️ CONSERVATIVE cleanup: {deleted_posts} posts, {deleted_comments} comments, {deleted_sentiment} sentiment records deleted")
+            logger.info(f"🗑️ Cleanup: {deleted_posts} posts, {deleted_comments} comments, {deleted_sentiment} sentiment records deleted")
 
             # Clear local caches
             self.processed_posts.clear()
@@ -326,12 +330,12 @@ class UltraOptimizedContinuousRedditScraper:
             logger.error(f"❌ Cleanup failed: {e}")
 
     def get_status(self) -> Dict:
-        """Get current scraper status with quota information"""
+        """Get current scraper status"""
         uptime = datetime.now(timezone.utc) - self.start_time
 
         return {
             'status': 'running',
-            'optimization_level': 'ULTRA_CONSERVATIVE',
+            'optimization_level': 'REALISTIC',
             'uptime_hours': round(uptime.total_seconds() / 3600, 2),
             'total_posts_scraped': self.total_posts_scraped,
             'total_comments_scraped': self.total_comments_scraped,
@@ -346,10 +350,10 @@ class UltraOptimizedContinuousRedditScraper:
         }
 
     def run_single_cycle(self):
-        """Run a single ULTRA-CONSERVATIVE scraping cycle (for testing)"""
-        logger.info("🧪 Running single ULTRA-CONSERVATIVE test cycle...")
+        """Run a single scraping cycle for testing"""
+        logger.info("🧪 Running single test cycle...")
         stats = self.scrape_cycle()
-        print("\n📊 ULTRA-CONSERVATIVE CYCLE RESULTS:")
+        print("\n📊 CYCLE RESULTS:")
         print(f"Posts: {stats.get('posts_scraped', 0)}")
         print(f"Comments: {stats.get('comments_scraped', 0)}")
         print(f"New posts: {stats.get('new_posts_processed', 0)}")
@@ -359,45 +363,45 @@ class UltraOptimizedContinuousRedditScraper:
         return stats
 
     def start_continuous_scraping(self):
-        """Start the ULTRA-CONSERVATIVE continuous scraping schedule"""
-        logger.info("🔄 Starting ULTRA-CONSERVATIVE continuous scraping every 90 minutes...")
-        logger.info("⚡ Using singleton Firebase manager with 1-hour caching for maximum efficiency")
-        logger.info("🎯 ULTRA-SELECTIVE: Only processing posts/comments with tickers")
+        """Start continuous scraping with reasonable intervals"""
+        logger.info("🔄 Starting continuous scraping every 30 minutes...")
+        logger.info("📊 Using realistic Firebase limits with smart caching")
+        logger.info("🎯 Focusing on posts/comments with tickers or high engagement")
 
-        # MUCH longer interval to reduce Firebase load dramatically
-        schedule.every(90).minutes.do(self.scrape_cycle)  # INCREASED from 20 to 90 minutes
+        # Reasonable interval - every 30 minutes
+        schedule.every(30).minutes.do(self.scrape_cycle)
 
-        # Schedule weekly cleanup (unchanged)
+        # Schedule weekly cleanup
         schedule.every().sunday.at("02:00").do(self.cleanup_old_data)
 
-        # Run initial cycle immediately
-        logger.info("🚀 Running initial ULTRA-CONSERVATIVE scraping cycle...")
+        # Run initial cycle
+        logger.info("🚀 Running initial scraping cycle...")
         self.scrape_cycle()
 
         # Main loop
         try:
             while True:
                 schedule.run_pending()
-                time.sleep(300)  # Check every 5 minutes (was 1 minute)
+                time.sleep(60)  # Check every minute
 
         except KeyboardInterrupt:
-            logger.info("⏹️ ULTRA-CONSERVATIVE continuous scraping stopped by user")
+            logger.info("⏹️ Continuous scraping stopped by user")
         except Exception as e:
-            logger.error(f"❌ ULTRA-CONSERVATIVE continuous scraping error: {e}")
+            logger.error(f"❌ Continuous scraping error: {e}")
 
 
 def main():
-    """Main function for testing or running"""
+    """Main function"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='ULTRA-Optimized Reddit Continuous Scraper')
+    parser = argparse.ArgumentParser(description='Reddit Continuous Scraper with Realistic Limits')
     parser.add_argument('--test', action='store_true', help='Run single cycle test')
     parser.add_argument('--continuous', action='store_true', help='Start continuous scraping')
     parser.add_argument('--status', action='store_true', help='Show current status')
 
     args = parser.parse_args()
 
-    scraper = UltraOptimizedContinuousRedditScraper()
+    scraper = ContinuousRedditScraper()
 
     if args.test:
         scraper.run_single_cycle()
@@ -405,10 +409,10 @@ def main():
         scraper.start_continuous_scraping()
     elif args.status:
         status = scraper.get_status()
-        print(f"📊 ULTRA-CONSERVATIVE Status: {status}")
+        print(f"📊 Status: {status}")
     else:
         # Default: run single test cycle
-        print("🧪 Running ULTRA-CONSERVATIVE test cycle (use --continuous for continuous mode)")
+        print("🧪 Running test cycle (use --continuous for continuous mode)")
         scraper.run_single_cycle()
 
 

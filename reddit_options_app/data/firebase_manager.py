@@ -1,6 +1,6 @@
 """
-Ultra-Optimized Firebase Manager for Reddit Options App
-Reduces Firebase reads from 49K to <50 per day
+Optimized Firebase Manager for Reddit Options App
+Uses realistic quota limits based on actual Firebase capacity
 """
 
 import sys
@@ -29,12 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 class FirebaseManager:
-    """Ultra-optimized Firebase manager - reduces reads from 49K to <50 per day"""
+    """Optimized Firebase manager with realistic quota limits"""
 
     _instance = None
     _cache = {}
     _cache_timestamps = {}
-    CACHE_DURATION = 3600  # 1 HOUR cache (was 5 minutes) - CRITICAL CHANGE
+    CACHE_DURATION = 300  # 5 minutes cache (reduced from 1 hour)
 
     def __new__(cls):
         """Singleton pattern to reuse Firebase connection"""
@@ -47,11 +47,11 @@ class FirebaseManager:
         """Initialize Firebase connection (only once)"""
         if not self._initialized:
             self.db = None
-            # QUOTA MANAGEMENT - CRITICAL ADDITION
+            # REALISTIC QUOTA MANAGEMENT
             self._firebase_read_count = 0
             self._last_read_reset = time.time()
-            self._max_reads_per_hour = 5  # HARD LIMIT: Only 5 reads per hour (was unlimited)
-            self._max_reads_per_day = 50  # HARD LIMIT: Only 50 reads per day
+            self._max_reads_per_hour = 1000  # Realistic: 1000 reads per hour (24,000/day)
+            self._max_reads_per_day = 35000   # Use 35k of your 40k daily limit
             self._daily_read_count = 0
             self._last_daily_reset = time.time()
 
@@ -59,7 +59,7 @@ class FirebaseManager:
             self._initialized = True
 
     def _initialize_firebase(self):
-        """Initialize Firebase Admin SDK - REMOVED CONNECTION TEST"""
+        """Initialize Firebase Admin SDK"""
         try:
             # Check if Firebase is already initialized
             if not firebase_admin._apps:
@@ -75,9 +75,7 @@ class FirebaseManager:
 
             # Get Firestore client
             self.db = firestore.client()
-
-            # REMOVED: Test connection to avoid wasting reads on connection test
-            logger.info("✅ Firebase connection ready (NO TEST WRITE - quota optimization)")
+            logger.info("✅ Firebase connection ready")
 
         except Exception as e:
             logger.error(f"Failed to initialize Firebase: {e}")
@@ -91,13 +89,11 @@ class FirebaseManager:
         if current_time - self._last_read_reset > 3600:  # 1 hour
             self._firebase_read_count = 0
             self._last_read_reset = current_time
-            logger.info("Firebase hourly read counter reset")
 
         # Reset daily counter
         if current_time - self._last_daily_reset > 86400:  # 24 hours
             self._daily_read_count = 0
             self._last_daily_reset = current_time
-            logger.info("Firebase daily read counter reset")
 
     def _can_make_read(self) -> bool:
         """Check if we can make a Firebase read without exceeding limits"""
@@ -114,10 +110,12 @@ class FirebaseManager:
         return hourly_ok and daily_ok
 
     def _increment_read_count(self):
-        """Increment and log read count"""
+        """Increment read count"""
         self._firebase_read_count += 1
         self._daily_read_count += 1
-        logger.warning(f"🔥 Firebase read #{self._firebase_read_count}/{self._max_reads_per_hour} this hour, #{self._daily_read_count}/{self._max_reads_per_day} today")
+        # Only log every 100 reads to reduce noise
+        if self._firebase_read_count % 100 == 0:
+            logger.info(f"📊 Firebase reads: {self._firebase_read_count}/hr, {self._daily_read_count}/day")
 
     def _get_cache_key(self, collection_name: str, filters: str, order_by: str, limit: str) -> str:
         """Generate cache key for query"""
@@ -155,17 +153,17 @@ class FirebaseManager:
             raise
 
     def batch_save(self, collection_name: str, documents: List[Dict], id_field: str = None) -> int:
-        """Save multiple documents in batches with aggressive deduplication"""
+        """Save multiple documents in batches with deduplication"""
         if not documents:
             return 0
 
         try:
             collection_ref = self.db.collection(collection_name)
             batch = self.db.batch()
-            batch_size = 100  # REDUCED from 450 to 100 for smaller batches
+            batch_size = 200  # Reasonable batch size
             saved_count = 0
 
-            # AGGRESSIVE deduplication to reduce writes
+            # Smart deduplication to reduce writes
             unique_docs = {}
             for doc_data in documents:
                 doc_id = doc_data.get(id_field) if id_field else None
@@ -176,7 +174,7 @@ class FirebaseManager:
                     content_hash = hash(str(sorted(doc_data.items())))
                     unique_docs[f"hash_{content_hash}"] = doc_data
 
-            logger.info(f"AGGRESSIVE deduplication: {len(documents)} -> {len(unique_docs)} unique documents")
+            logger.info(f"Deduplication: {len(documents)} -> {len(unique_docs)} unique documents")
 
             for i, (doc_id, doc_data) in enumerate(unique_docs.items()):
                 if id_field and id_field in doc_data:
@@ -194,7 +192,7 @@ class FirebaseManager:
                     saved_count += batch_size
                     batch = self.db.batch()  # Start new batch
                     logger.info(f"Saved batch of {batch_size} documents to {collection_name}")
-                    time.sleep(0.5)  # Longer pause between batches
+                    time.sleep(0.2)  # Brief pause between batches
 
             # Commit remaining documents
             remaining = len(unique_docs) % batch_size
@@ -215,12 +213,12 @@ class FirebaseManager:
         cache_key = f"doc_{collection_name}_{document_id}"
 
         if self._is_cache_valid(cache_key):
-            logger.info(f"Using cached document: {document_id}")
+            logger.debug(f"Using cached document: {document_id}")
             return self._cache[cache_key]
 
         # Check quota limits
         if not self._can_make_read():
-            logger.warning(f"Firebase quota exceeded - returning cached data or None for {document_id}")
+            logger.warning(f"Firebase quota exceeded - returning cached data for {document_id}")
             return self._cache.get(cache_key, None)
 
         try:
@@ -244,23 +242,23 @@ class FirebaseManager:
                        limit: int = None,
                        desc: bool = False,
                        use_cache: bool = True) -> List[Dict]:
-        """Query documents with ULTRA-AGGRESSIVE caching and quota limits"""
+        """Query documents with smart caching"""
 
         # Generate cache key
         filters_str = str(filters) if filters else "none"
         cache_key = self._get_cache_key(collection_name, filters_str, str(order_by), str(limit))
 
-        # ALWAYS try cache first
+        # Try cache first
         if use_cache and self._is_cache_valid(cache_key):
-            logger.info(f"✅ Using 1-HOUR cached result for {collection_name} (SAVED Firebase read!)")
+            logger.debug(f"✅ Using cached result for {collection_name}")
             return self._cache[cache_key]
 
-        # Check quota limits BEFORE making any Firebase calls
+        # Check quota limits
         if not self._can_make_read():
-            logger.warning(f"🚨 Firebase quota exceeded - returning expired cache or empty for {collection_name}")
+            logger.warning(f"Firebase quota exceeded - returning cached result for {collection_name}")
             # Return expired cache if available, otherwise empty list
             if cache_key in self._cache:
-                logger.info("Returning EXPIRED cache due to quota limits")
+                logger.info("Returning expired cache due to quota limits")
                 return self._cache[cache_key]
             else:
                 logger.info("No cache available and quota exceeded - returning empty list")
@@ -279,13 +277,13 @@ class FirebaseManager:
                 direction = firestore.Query.DESCENDING if desc else firestore.Query.ASCENDING
                 query = query.order_by(order_by, direction=direction)
 
-            # Apply VERY AGGRESSIVE limits to save quota
+            # Apply reasonable limits (no need to be ultra-conservative)
             if limit:
-                # ULTRA-CONSERVATIVE: Cap all limits at 50 (was 200)
-                max_limit = min(limit, 50)
+                # Use reasonable limits instead of ultra-conservative ones
+                max_limit = min(limit, 500)  # Allow up to 500 results
                 query = query.limit(max_limit)
                 if limit > max_limit:
-                    logger.warning(f"🔥 Query limit AGGRESSIVELY reduced from {limit} to {max_limit} to save quota")
+                    logger.info(f"Query limit reduced from {limit} to {max_limit}")
 
             # Execute query and COUNT IT
             docs = query.stream()
@@ -297,10 +295,9 @@ class FirebaseManager:
                 doc_dict['_id'] = doc.id  # Include document ID
                 results.append(doc_dict)
 
-            # Cache the result for 1 HOUR
+            # Cache the result
             if use_cache:
                 self._cache_result(cache_key, results)
-                logger.info(f"💾 Cached result for 1 HOUR: {collection_name}")
 
             return results
 
@@ -310,12 +307,12 @@ class FirebaseManager:
             return self._cache.get(cache_key, [])
 
     def get_recent_posts(self, limit: int = 100, hours: int = 24, use_cache: bool = True) -> List[Dict]:
-        """Get recent Reddit posts with ULTRA-CONSERVATIVE limits"""
-        # AGGRESSIVE limit reduction
-        optimized_limit = min(limit, 30)  # REDUCED from 200 to 30
+        """Get recent Reddit posts with reasonable limits"""
+        # Use reasonable limits instead of ultra-conservative
+        optimized_limit = min(limit, 200)  # Allow up to 200 posts
 
         if limit > optimized_limit:
-            logger.warning(f"🔥 Recent posts limit reduced from {limit} to {optimized_limit} for quota optimization")
+            logger.info(f"Recent posts limit adjusted from {limit} to {optimized_limit}")
 
         try:
             # Calculate timestamp cutoff
@@ -339,7 +336,7 @@ class FirebaseManager:
             return []
 
     def get_posts_by_ticker(self, ticker: str, limit: int = 50, use_cache: bool = True) -> List[Dict]:
-        """Get posts mentioning a specific ticker with AGGRESSIVE limits"""
+        """Get posts mentioning a specific ticker"""
         try:
             filters = [
                 ('tickers', 'array_contains', ticker.upper())
@@ -349,7 +346,7 @@ class FirebaseManager:
                 collection_name=FIREBASE_CONFIG['collections']['reddit_posts'],
                 filters=filters,
                 order_by='created_utc',
-                limit=min(limit, 20),  # REDUCED from 100 to 20
+                limit=min(limit, 100),  # Allow up to 100 posts per ticker
                 desc=True,
                 use_cache=use_cache
             )
@@ -359,16 +356,16 @@ class FirebaseManager:
             return []
 
     def get_trending_tickers(self, hours: int = 24, min_mentions: int = 5, use_cache: bool = True) -> List[Dict]:
-        """Get trending tickers with ULTRA-AGGRESSIVE caching"""
+        """Get trending tickers with reasonable caching"""
         cache_key = f"trending_{hours}h_{min_mentions}min"
 
         if use_cache and self._is_cache_valid(cache_key):
-            logger.info(f"✅ Using 1-HOUR cached trending data (SAVED Firebase read!)")
+            logger.debug(f"✅ Using cached trending data")
             return self._cache[cache_key]
 
         try:
-            # ULTRA-REDUCED limit to save quota
-            recent_posts = self.get_recent_posts(limit=50, hours=hours, use_cache=use_cache)  # REDUCED from 300 to 50
+            # Get reasonable amount of recent posts
+            recent_posts = self.get_recent_posts(limit=300, hours=hours, use_cache=use_cache)
 
             # Count ticker mentions
             ticker_counts = {}
@@ -397,12 +394,11 @@ class FirebaseManager:
 
             # Sort by mention count
             trending.sort(key=lambda x: x['mention_count'], reverse=True)
-            result = trending[:15]  # REDUCED from 20 to 15
+            result = trending[:25]  # Return top 25 trending
 
-            # Cache the result for 1 HOUR
+            # Cache the result
             if use_cache:
                 self._cache_result(cache_key, result)
-                logger.info(f"💾 Cached trending data for 1 HOUR")
 
             return result
 
@@ -420,16 +416,16 @@ class FirebaseManager:
             return 0
 
     def get_sentiment_overview(self, hours: int = 24, use_cache: bool = True) -> List[Dict]:
-        """Get sentiment overview with ULTRA-AGGRESSIVE caching"""
+        """Get sentiment overview with reasonable caching"""
         cache_key = f"sentiment_overview_{hours}h"
 
         if use_cache and self._is_cache_valid(cache_key):
-            logger.info(f"✅ Using 1-HOUR cached sentiment overview (SAVED Firebase read!)")
+            logger.debug(f"✅ Using cached sentiment overview")
             return self._cache[cache_key]
 
         # Check quota before making Firebase calls
         if not self._can_make_read():
-            logger.warning(f"🚨 Firebase quota exceeded - returning cached sentiment or empty")
+            logger.warning(f"Firebase quota exceeded - returning cached sentiment")
             return self._cache.get(cache_key, [])
 
         try:
@@ -445,7 +441,7 @@ class FirebaseManager:
                 collection_name=FIREBASE_CONFIG['collections']['sentiment_data'],
                 filters=filters,
                 order_by='timestamp',
-                limit=50,  # REDUCED from 100 to 50
+                limit=200,  # Reasonable limit
                 desc=True,
                 use_cache=use_cache
             )
@@ -459,10 +455,9 @@ class FirebaseManager:
 
             result = list(latest_sentiments.values())
 
-            # Cache the result for 1 HOUR
+            # Cache the result
             if use_cache:
                 self._cache_result(cache_key, result)
-                logger.info(f"💾 Cached sentiment overview for 1 HOUR")
 
             logger.info(f"Retrieved sentiment overview: {len(result)} tickers")
             return result
@@ -496,22 +491,21 @@ class FirebaseManager:
         }
 
     def delete_old_data(self, collection_name: str, days: int = 30) -> int:
-        """Delete old data from a collection with smaller batches"""
+        """Delete old data from a collection"""
         try:
             cutoff_time = datetime.now(timezone.utc).timestamp() - (days * 24 * 3600)
 
-            # SMALLER batches to reduce resource usage
             old_docs = self.query_documents(
                 collection_name=collection_name,
                 filters=[('created_utc', '<', cutoff_time)],
-                limit=50,  # REDUCED from 100 to 50
+                limit=100,
                 use_cache=False  # Don't cache deletion queries
             )
 
             if not old_docs:
                 return 0
 
-            # Delete in SMALLER batches
+            # Delete in reasonable batches
             batch = self.db.batch()
             deleted_count = 0
 
@@ -520,13 +514,13 @@ class FirebaseManager:
                 batch.delete(doc_ref)
                 deleted_count += 1
 
-                if deleted_count % 50 == 0:  # REDUCED from 100 to 50
+                if deleted_count % 100 == 0:
                     batch.commit()
                     batch = self.db.batch()
-                    time.sleep(1)  # Longer pause between batches
+                    time.sleep(0.5)
 
             # Commit remaining deletes
-            if deleted_count % 50 != 0:
+            if deleted_count % 100 != 0:
                 batch.commit()
 
             logger.info(f"Deleted {deleted_count} old documents from {collection_name}")
@@ -557,7 +551,7 @@ OptimizedFirebaseManager = FirebaseManager
 
 
 def main():
-    """Test ultra-optimized Firebase manager"""
+    """Test realistic Firebase manager"""
     try:
         fm = FirebaseManager()
 
@@ -565,30 +559,30 @@ def main():
         quota_status = fm.get_quota_status()
         print(f"📊 Quota Status: {quota_status}")
 
-        # Test caching with quota management
-        print("\n🔍 Testing ultra-conservative queries...")
+        # Test reasonable queries
+        print("\n🔍 Testing realistic queries...")
 
-        # First call - should use Firebase (if quota allows)
+        # First call
         start_time = time.time()
         trending1 = fm.get_trending_tickers(hours=24)
         time1 = time.time() - start_time
         print(f"First call: {len(trending1)} tickers in {time1:.2f}s")
 
-        # Second call - should use 1-hour cache
+        # Second call - should use cache
         start_time = time.time()
         trending2 = fm.get_trending_tickers(hours=24)
         time2 = time.time() - start_time
-        print(f"Second call: {len(trending2)} tickers in {time2:.2f}s (should be cached)")
+        print(f"Second call: {len(trending2)} tickers in {time2:.2f}s (cached)")
 
         # Show final stats
         cache_stats = fm.get_cache_stats()
         print(f"📊 Cache stats: {cache_stats}")
 
-        print("✅ Ultra-optimized Firebase manager working!")
-        print(f"🎯 This system should use <50 Firebase reads per day (vs your previous 49K!)")
+        print("✅ Realistic Firebase manager working!")
+        print(f"🎯 Using {fm._max_reads_per_day} of your 40,000 daily Firebase reads")
 
     except Exception as e:
-        print(f"❌ Ultra-optimized Firebase manager test failed: {e}")
+        print(f"❌ Firebase manager test failed: {e}")
 
 
 if __name__ == "__main__":

@@ -184,12 +184,11 @@ Respond with ONLY this JSON format:
     "reasoning": "brief explanation"
 }}"""
 
-                # Additional parameters to control Grok's reasoning
+                # FIXED: Only use parameters supported by Grok
                 extra_params = {
                     'top_p': 0.1,  # More focused responses
-                    'stop': ['\n\n', '```', 'Note:', 'Explanation:'],  # Stop reasoning early
-                    'frequency_penalty': 0.0,
-                    'presence_penalty': 0.0
+                    'stop': ['\n\n', '```', 'Note:', 'Explanation:']  # Stop reasoning early
+                    # REMOVED: frequency_penalty and presence_penalty - not supported by Grok
                 }
             else:
                 # OpenAI settings (unchanged)
