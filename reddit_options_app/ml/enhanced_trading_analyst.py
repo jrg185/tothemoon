@@ -248,227 +248,242 @@ class EnhancedTradingAnalyst:
             logger.warning(f"⚠️ ML forecast exception: {e}")
             return {'error': str(e)}
 
-    def generate_enhanced_analysis(self,
-                                   ticker: str,
-                                   sentiment_data: Dict,
-                                   market_data: Dict,
-                                   technical_indicators: Dict,
-                                   reddit_mentions: List[Dict],
-                                   ml_forecast: Dict = None) -> Dict:
-        """Generate comprehensive AI analysis of trading opportunity with ML integration"""
+        def generate_enhanced_analysis(self,
+                                       ticker: str,
+                                       sentiment_data: Dict,
+                                       market_data: Dict,
+                                       technical_indicators: Dict,
+                                       reddit_mentions: List[Dict],
+                                       ml_forecast: Dict = None) -> Dict:
+            """Generate comprehensive AI analysis of trading opportunity with ML integration"""
 
-        cache_key = f"analysis_{ticker}_{int(time.time() / self.cache_duration)}"
-        if cache_key in self.analysis_cache:
-            return self.analysis_cache[cache_key]
+            cache_key = f"analysis_{ticker}_{int(time.time() / self.cache_duration)}"
+            if cache_key in self.analysis_cache:
+                return self.analysis_cache[cache_key]
 
-        try:
-            # Prepare context for LLM analysis
-            current_price = market_data.get('current_price', 0)
-            change_percent = market_data.get('change_percent', 0)
-            sentiment = sentiment_data.get('sentiment', 'neutral')
-            confidence = sentiment_data.get('confidence', 0)
-            mention_count = sentiment_data.get('mention_count', 0)
+            try:
+                # Prepare context for LLM analysis - FIXED: Handle None values properly
+                current_price = market_data.get('current_price', 0) or 0
+                change_percent = market_data.get('change_percent', 0) or 0
+                sentiment = sentiment_data.get('sentiment', 'neutral') or 'neutral'
+                confidence = sentiment_data.get('confidence', 0) or 0
+                mention_count = sentiment_data.get('mention_count', 0) or 0
 
-            # Recent news headlines
-            news_context = ""
-            if 'recent_news' in market_data:
-                headlines = [news['headline'] for news in market_data['recent_news'][:3]]
-                news_context = "Recent news: " + "; ".join(headlines)
+                # Recent news headlines
+                news_context = ""
+                if 'recent_news' in market_data:
+                    headlines = [news['headline'] for news in market_data['recent_news'][:3] if news.get('headline')]
+                    news_context = "Recent news: " + "; ".join(headlines) if headlines else "No recent news"
 
-            # Technical context
-            tech_context = ""
-            if technical_indicators:
-                tech_items = []
-                if 'price_vs_sma20' in technical_indicators:
-                    tech_items.append(f"Price vs 20-day SMA: {technical_indicators['price_vs_sma20']:.1f}%")
-                if 'volatility_20d' in technical_indicators:
-                    tech_items.append(f"20-day volatility: {technical_indicators['volatility_20d']:.1f}%")
-                if 'volume_trend' in technical_indicators:
-                    tech_items.append(f"Volume trend: {technical_indicators['volume_trend']:.1f}%")
-                tech_context = "; ".join(tech_items)
+                # Technical context - FIXED: Handle None values
+                tech_context = ""
+                if technical_indicators:
+                    tech_items = []
+                    price_vs_sma20 = technical_indicators.get('price_vs_sma20')
+                    if price_vs_sma20 is not None:
+                        tech_items.append(f"Price vs 20-day SMA: {price_vs_sma20:.1f}%")
 
-            # Reddit sentiment context
-            reddit_context = f"WSB mentions: {mention_count}, sentiment: {sentiment} (confidence: {confidence:.2f})"
+                    volatility_20d = technical_indicators.get('volatility_20d')
+                    if volatility_20d is not None:
+                        tech_items.append(f"20-day volatility: {volatility_20d:.1f}%")
 
-            # ML forecast context
-            ml_context = ""
-            if ml_forecast and 'error' not in ml_forecast:
-                ml_direction = ml_forecast.get('direction', 'unknown')
-                ml_confidence = ml_forecast.get('confidence', 0)
-                ml_change = ml_forecast.get('price_change_pct', 0)
-                ml_context = f"ML Model Prediction: {ml_direction} ({ml_confidence:.1%} confidence, {ml_change:+.1f}% expected change)"
-            elif ml_forecast:
-                ml_context = f"ML Model: {ml_forecast.get('error', 'unavailable')}"
-            else:
-                ml_context = "ML Model: not available"
+                    volume_trend = technical_indicators.get('volume_trend')
+                    if volume_trend is not None:
+                        tech_items.append(f"Volume trend: {volume_trend:.1f}%")
 
-            # Sample of recent mentions for context
-            mention_samples = []
-            for mention in reddit_mentions[:3]:
-                text = mention.get('text', '')[:100]
-                score = mention.get('score', 0)
-                mention_samples.append(f"'{text}' (score: {score})")
+                    tech_context = "; ".join(tech_items) if tech_items else "No technical data available"
 
-            prompt = f"""
-Analyze this trading opportunity for {ticker}:
+                # Reddit sentiment context
+                reddit_context = f"WSB mentions: {mention_count}, sentiment: {sentiment} (confidence: {confidence:.2f})"
 
-CURRENT MARKET DATA:
-- Price: ${current_price:.2f} ({change_percent:+.2f}%)
-- Company: {market_data.get('company_name', ticker)}
-- Industry: {market_data.get('industry', 'Unknown')}
-- Market Cap: ${market_data.get('market_cap', 0):.1f}M
-- P/E Ratio: {market_data.get('pe_ratio', 0):.1f}
+                # ML forecast context - FIXED: Handle None values
+                ml_context = ""
+                if ml_forecast and 'error' not in ml_forecast:
+                    ml_direction = ml_forecast.get('direction', 'unknown') or 'unknown'
+                    ml_confidence = ml_forecast.get('confidence', 0) or 0
+                    ml_change = ml_forecast.get('price_change_pct', 0) or 0
+                    ml_context = f"ML Model Prediction: {ml_direction} ({ml_confidence:.1%} confidence, {ml_change:+.1f}% expected change)"
+                elif ml_forecast:
+                    ml_context = f"ML Model: {ml_forecast.get('error', 'unavailable')}"
+                else:
+                    ml_context = "ML Model: not available"
 
-TECHNICAL ANALYSIS:
-{tech_context}
+                # Sample of recent mentions for context
+                mention_samples = []
+                for mention in reddit_mentions[:3]:
+                    text = mention.get('text', '')[:100] if mention.get('text') else ''
+                    score = mention.get('score', 0) or 0
+                    if text:  # Only add if we have text
+                        mention_samples.append(f"'{text}' (score: {score})")
 
-REDDIT SENTIMENT:
-{reddit_context}
+                # FIXED: Use safe formatting for company info
+                company_name = market_data.get('company_name') or ticker
+                industry = market_data.get('industry') or 'Unknown'
+                market_cap = market_data.get('market_cap', 0) or 0
+                pe_ratio = market_data.get('pe_ratio', 0) or 0
 
-ML FORECAST:
-{ml_context}
+                prompt = f"""
+    Analyze this trading opportunity for {ticker}:
 
-RECENT NEWS:
-{news_context}
+    CURRENT MARKET DATA:
+    - Price: ${current_price:.2f} ({change_percent:+.2f}%)
+    - Company: {company_name}
+    - Industry: {industry}
+    - Market Cap: ${market_cap:.1f}M
+    - P/E Ratio: {pe_ratio:.1f}
 
-SAMPLE REDDIT MENTIONS:
-{'; '.join(mention_samples)}
+    TECHNICAL ANALYSIS:
+    {tech_context}
 
-Provide a comprehensive trading analysis in this EXACT JSON format:
-{{
-    "overall_rating": "STRONG_BUY|BUY|HOLD|SELL|STRONG_SELL",
-    "confidence_score": 0.0-1.0,
-    "target_price": number,
-    "stop_loss": number,
-    "time_horizon": "1-7 days|1-2 weeks|1 month|3+ months",
-    "key_catalysts": ["catalyst1", "catalyst2", "catalyst3"],
-    "risk_factors": ["risk1", "risk2", "risk3"],
-    "options_strategy": {{
-        "recommended_play": "calls|puts|straddle|iron_condor|cash",
-        "strike_selection": "ATM|OTM|ITM|multiple_strikes",
-        "expiration": "weekly|monthly|quarterly",
-        "reasoning": "brief explanation"
-    }},
-    "technical_outlook": {{
-        "trend": "bullish|bearish|sideways",
-        "support_level": number,
-        "resistance_level": number,
-        "momentum": "strong|moderate|weak"
-    }},
-    "sentiment_analysis": {{
-        "wsb_sentiment": "very_bullish|bullish|neutral|bearish|very_bearish",
-        "sentiment_quality": "high|medium|low",
-        "contrarian_signal": true/false
-    }},
-    "ml_integration": {{
-        "ml_direction_agreement": "agrees|disagrees|neutral",
-        "combined_confidence": 0.0-1.0,
-        "ml_sentiment_alignment": "aligned|conflicted|neutral"
-    }},
-    "executive_summary": "2-3 sentence summary of the play including ML insights"
-}}
+    REDDIT SENTIMENT:
+    {reddit_context}
 
-IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON.
-"""
+    ML FORECAST:
+    {ml_context}
 
-            # Make LLM call with appropriate parameters for provider
-            if LLM_CONFIG['default_provider'] == 'xai':
-                response = self.llm_client.chat.completions.create(
-                    model=self.llm_model,
-                    messages=[
-                        {"role": "system",
-                         "content": "You are an expert quantitative trader and financial analyst with access to ML models. Provide detailed, actionable trading analysis that integrates ML predictions with fundamental and technical analysis. Return only valid JSON."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.1,
-                    max_tokens=4000,
-                    timeout=45
-                )
-            else:
-                response = self.llm_client.chat.completions.create(
-                    model=self.llm_model,
-                    messages=[
-                        {"role": "system",
-                         "content": "You are an expert quantitative trader and financial analyst with access to ML models. Provide detailed, actionable trading analysis that integrates ML predictions with fundamental and technical analysis. Return only valid JSON."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.1,
-                    max_tokens=2000,
-                    timeout=30
-                )
+    RECENT NEWS:
+    {news_context}
 
-            # Parse response
-            raw_content = response.choices[0].message.content.strip()
+    SAMPLE REDDIT MENTIONS:
+    {'; '.join(mention_samples) if mention_samples else 'No mentions available'}
 
-            # Clean JSON response
-            if raw_content.startswith('```json'):
-                raw_content = raw_content[7:]
-            elif raw_content.startswith('```'):
-                raw_content = raw_content[3:]
-            if raw_content.endswith('```'):
-                raw_content = raw_content[:-3]
+    Provide a comprehensive trading analysis in this EXACT JSON format:
+    {{
+        "overall_rating": "STRONG_BUY|BUY|HOLD|SELL|STRONG_SELL",
+        "confidence_score": 0.0-1.0,
+        "target_price": number,
+        "stop_loss": number,
+        "time_horizon": "1-7 days|1-2 weeks|1 month|3+ months",
+        "key_catalysts": ["catalyst1", "catalyst2", "catalyst3"],
+        "risk_factors": ["risk1", "risk2", "risk3"],
+        "options_strategy": {{
+            "recommended_play": "calls|puts|straddle|iron_condor|cash",
+            "strike_selection": "ATM|OTM|ITM|multiple_strikes",
+            "expiration": "weekly|monthly|quarterly",
+            "reasoning": "brief explanation"
+        }},
+        "technical_outlook": {{
+            "trend": "bullish|bearish|sideways",
+            "support_level": number,
+            "resistance_level": number,
+            "momentum": "strong|moderate|weak"
+        }},
+        "sentiment_analysis": {{
+            "wsb_sentiment": "very_bullish|bullish|neutral|bearish|very_bearish",
+            "sentiment_quality": "high|medium|low",
+            "contrarian_signal": true/false
+        }},
+        "ml_integration": {{
+            "ml_direction_agreement": "agrees|disagrees|neutral",
+            "combined_confidence": 0.0-1.0,
+            "ml_sentiment_alignment": "aligned|conflicted|neutral"
+        }},
+        "executive_summary": "2-3 sentence summary of the play including ML insights"
+    }}
 
-            raw_content = raw_content.strip()
+    IMPORTANT: Return ONLY valid JSON. No markdown, no explanations outside the JSON.
+    """
 
-            # Find JSON boundaries
-            start_idx = raw_content.find('{')
-            end_idx = raw_content.rfind('}')
+                # Make LLM call with appropriate parameters for provider
+                if LLM_CONFIG['default_provider'] == 'xai':
+                    response = self.llm_client.chat.completions.create(
+                        model=self.llm_model,
+                        messages=[
+                            {"role": "system",
+                             "content": "You are an expert quantitative trader and financial analyst with access to ML models. Provide detailed, actionable trading analysis that integrates ML predictions with fundamental and technical analysis. Return only valid JSON."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=4000,
+                        timeout=45
+                    )
+                else:
+                    response = self.llm_client.chat.completions.create(
+                        model=self.llm_model,
+                        messages=[
+                            {"role": "system",
+                             "content": "You are an expert quantitative trader and financial analyst with access to ML models. Provide detailed, actionable trading analysis that integrates ML predictions with fundamental and technical analysis. Return only valid JSON."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=2000,
+                        timeout=30
+                    )
 
-            if start_idx != -1 and end_idx != -1:
-                json_content = raw_content[start_idx:end_idx + 1]
-                analysis = json.loads(json_content)
+                # Parse response
+                raw_content = response.choices[0].message.content.strip()
 
-                # Add metadata
-                analysis['ticker'] = ticker
-                analysis['analysis_timestamp'] = datetime.now(timezone.utc).isoformat()
-                analysis['data_sources'] = ['reddit_sentiment', 'market_data', 'technical_analysis', 'recent_news', 'ml_forecast']
-                analysis['ml_forecast_available'] = ml_forecast is not None and 'error' not in ml_forecast
+                # Clean JSON response
+                if raw_content.startswith('```json'):
+                    raw_content = raw_content[7:]
+                elif raw_content.startswith('```'):
+                    raw_content = raw_content[3:]
+                if raw_content.endswith('```'):
+                    raw_content = raw_content[:-3]
 
-                # Cache the result
-                self.analysis_cache[cache_key] = analysis
+                raw_content = raw_content.strip()
 
-                return analysis
-            else:
-                raise ValueError("No valid JSON found in response")
+                # Find JSON boundaries
+                start_idx = raw_content.find('{')
+                end_idx = raw_content.rfind('}')
 
-        except Exception as e:
-            logger.error(f"Error generating enhanced analysis for {ticker}: {e}")
-            # Return basic analysis as fallback
-            return {
-                'ticker': ticker,
-                'overall_rating': 'HOLD',
-                'confidence_score': 0.5,
-                'target_price': market_data.get('current_price', 0),
-                'stop_loss': market_data.get('current_price', 0) * 0.95,
-                'time_horizon': '1-2 weeks',
-                'key_catalysts': ['Reddit momentum'],
-                'risk_factors': ['Market volatility'],
-                'options_strategy': {
-                    'recommended_play': 'calls' if sentiment == 'bullish' else 'puts',
-                    'strike_selection': 'ATM',
-                    'expiration': 'weekly',
-                    'reasoning': 'Basic sentiment-based play'
-                },
-                'technical_outlook': {
-                    'trend': sentiment,
-                    'support_level': market_data.get('current_price', 0) * 0.95,
-                    'resistance_level': market_data.get('current_price', 0) * 1.05,
-                    'momentum': 'moderate'
-                },
-                'sentiment_analysis': {
-                    'wsb_sentiment': sentiment,
-                    'sentiment_quality': 'medium',
-                    'contrarian_signal': False
-                },
-                'ml_integration': {
-                    'ml_direction_agreement': 'neutral',
-                    'combined_confidence': 0.5,
-                    'ml_sentiment_alignment': 'neutral'
-                },
-                'executive_summary': f"Basic analysis for {ticker} based on {sentiment} sentiment",
-                'analysis_timestamp': datetime.now(timezone.utc).isoformat(),
-                'error': str(e)
-            }
+                if start_idx != -1 and end_idx != -1:
+                    json_content = raw_content[start_idx:end_idx + 1]
+                    analysis = json.loads(json_content)
+
+                    # Add metadata
+                    analysis['ticker'] = ticker
+                    analysis['analysis_timestamp'] = datetime.now(timezone.utc).isoformat()
+                    analysis['data_sources'] = ['reddit_sentiment', 'market_data', 'technical_analysis', 'recent_news',
+                                                'ml_forecast']
+                    analysis['ml_forecast_available'] = ml_forecast is not None and 'error' not in ml_forecast
+
+                    # Cache the result
+                    self.analysis_cache[cache_key] = analysis
+
+                    return analysis
+                else:
+                    raise ValueError("No valid JSON found in response")
+
+            except Exception as e:
+                logger.error(f"Error generating enhanced analysis for {ticker}: {e}")
+                # Return basic analysis as fallback - FIXED: Handle None values safely
+                current_price = market_data.get('current_price', 0) or 0
+                return {
+                    'ticker': ticker,
+                    'overall_rating': 'HOLD',
+                    'confidence_score': 0.5,
+                    'target_price': current_price,
+                    'stop_loss': current_price * 0.95,
+                    'time_horizon': '1-2 weeks',
+                    'key_catalysts': ['Reddit momentum'],
+                    'risk_factors': ['Market volatility'],
+                    'options_strategy': {
+                        'recommended_play': 'calls' if sentiment == 'bullish' else 'puts',
+                        'strike_selection': 'ATM',
+                        'expiration': 'weekly',
+                        'reasoning': 'Basic sentiment-based play'
+                    },
+                    'technical_outlook': {
+                        'trend': sentiment,
+                        'support_level': current_price * 0.95,
+                        'resistance_level': current_price * 1.05,
+                        'momentum': 'moderate'
+                    },
+                    'sentiment_analysis': {
+                        'wsb_sentiment': sentiment,
+                        'sentiment_quality': 'medium',
+                        'contrarian_signal': False
+                    },
+                    'ml_integration': {
+                        'ml_direction_agreement': 'neutral',
+                        'combined_confidence': 0.5,
+                        'ml_sentiment_alignment': 'neutral'
+                    },
+                    'executive_summary': f"Basic analysis for {ticker} based on {sentiment} sentiment",
+                    'analysis_timestamp': datetime.now(timezone.utc).isoformat(),
+                    'error': str(e)
+                }
 
     def analyze_trading_opportunity(self,
                                     ticker: str,

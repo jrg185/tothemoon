@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 # Add project root to Python path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 import time
@@ -19,8 +19,27 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from data.firebase_manager import FirebaseManager
-from ml.enhanced_trading_analyst import EnhancedTradingAnalyst
-from ml.ml_price_forecaster import MLPriceForecaster
+
+# Import ML components with proper availability checking
+try:
+    from ml.enhanced_trading_analyst import EnhancedTradingAnalyst
+    from ml.ml_price_forecaster import MLPriceForecaster
+    from ml import ML_COMPONENTS_AVAILABLE, ML_DATABASE_AVAILABLE
+
+    if ML_COMPONENTS_AVAILABLE and ML_DATABASE_AVAILABLE:
+        AUTOMATED_ANALYSIS_AVAILABLE = True
+        print("✅ All ML components available for automated analysis")
+    else:
+        AUTOMATED_ANALYSIS_AVAILABLE = True  # Can still work with limited functionality
+        print("⚠️ ML database not fully available - automated analysis will work with limited functionality")
+
+except ImportError as e:
+    AUTOMATED_ANALYSIS_AVAILABLE = False
+    EnhancedTradingAnalyst = None
+    MLPriceForecaster = None
+    ML_COMPONENTS_AVAILABLE = False
+    ML_DATABASE_AVAILABLE = False
+    logging.warning(f"Advanced ML components not available: {e}")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

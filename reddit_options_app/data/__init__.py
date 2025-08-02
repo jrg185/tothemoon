@@ -1,12 +1,5 @@
 """
 Data collection and management module for Reddit Options App
-
-This module provides classes and utilities for:
-- Reddit data scraping from r/wallstreetbets
-- Firebase/Firestore database operations
-- LLM-powered stock ticker extraction from text
-- ML prediction tracking and performance monitoring
-- Data models for posts and comments
 """
 
 from .reddit_scraper import (
@@ -17,12 +10,13 @@ from .reddit_scraper import (
 from .firebase_manager import FirebaseManager
 from .llm_ticker_extractor import EnhancedTickerExtractor, LLMTickerExtractor
 
-# ML Database Manager (with graceful fallback)
+# ML Database Manager (with proper error handling)
 try:
     from .ml_database_manager import MLDatabaseManager
     ML_DATABASE_AVAILABLE = True
+    print("✅ MLDatabaseManager imported successfully")
 except ImportError as e:
-    print(f"⚠️ ML Database Manager not available: {e}")
+    print(f"⚠️ MLDatabaseManager not available: {e}")
     MLDatabaseManager = None
     ML_DATABASE_AVAILABLE = False
 
@@ -37,14 +31,10 @@ __all__ = [
     'RedditPost',
     'RedditComment',
 
-    # ML Database (if available)
+    # ML Database (with availability flag)
     'MLDatabaseManager',
     'ML_DATABASE_AVAILABLE'
 ]
 
 # Module version
 __version__ = '2.1.0'
-
-# Module metadata
-__author__ = 'Reddit Options App'
-__description__ = 'LLM-powered data collection and management with ML prediction tracking for options trading sentiment analysis'

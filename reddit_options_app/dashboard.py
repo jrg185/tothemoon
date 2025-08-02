@@ -416,185 +416,396 @@ class CleanTradingDashboard:
         return min(score, 100)
 
     def render_clean_opportunity_card(self, stock: Dict, show_enhanced: bool = False):
-        """Render clean, focused opportunity card"""
-        sentiment_emoji = {'bullish': '🚀', 'bearish': '📉', 'neutral': '😐'}[stock['sentiment']]
+        """Render clean, focused opportunity card with FIXED HTML rendering"""
+
+        # Determine overall sentiment from AI + ML + Reddit
+        ai_rating = stock.get('enhanced_analysis', {}).get('ai_analysis', {}).get('overall_rating', 'HOLD')
+        ml_direction = stock.get('enhanced_analysis', {}).get('ml_forecast', {}).get('direction', stock['sentiment'])
+        reddit_sentiment = stock['sentiment']
+
+        # Smart recommendation logic - prioritize AI > ML > Reddit
+        if ai_rating in ['STRONG_BUY', 'BUY']:
+            final_recommendation = 'CALLS'
+            final_sentiment = 'bullish'
+            card_color = '#1B4332'  # Dark green
+            border_color = '#2D6A4F'
+            accent_color = '#52B788'
+        elif ai_rating in ['STRONG_SELL', 'SELL']:
+            final_recommendation = 'PUTS'
+            final_sentiment = 'bearish'
+            card_color = '#4D1F1F'  # Dark red
+            border_color = '#8B3A3A'
+            accent_color = '#E74C3C'
+        elif ml_direction == 'up':
+            final_recommendation = 'CALLS'
+            final_sentiment = 'bullish'
+            card_color = '#1B4332'
+            border_color = '#2D6A4F'
+            accent_color = '#52B788'
+        elif ml_direction == 'down':
+            final_recommendation = 'PUTS'
+            final_sentiment = 'bearish'
+            card_color = '#4D1F1F'
+            border_color = '#8B3A3A'
+            accent_color = '#E74C3C'
+        elif reddit_sentiment == 'bullish':
+            final_recommendation = 'CALLS'
+            final_sentiment = 'bullish'
+            card_color = '#1B4332'
+            border_color = '#2D6A4F'
+            accent_color = '#52B788'
+        elif reddit_sentiment == 'bearish':
+            final_recommendation = 'PUTS'
+            final_sentiment = 'bearish'
+            card_color = '#4D1F1F'
+            border_color = '#8B3A3A'
+            accent_color = '#E74C3C'
+        else:
+            final_recommendation = 'HOLD'
+            final_sentiment = 'neutral'
+            card_color = '#2C2C2C'
+            border_color = '#666666'
+            accent_color = '#999999'
 
         # Price styling
-        if stock['change_percent'] > 0:
-            price_class = "price-up"
+        price_change = stock['change_percent']
+        if price_change > 0:
+            price_color = "#00FF88"
             price_arrow = "↗"
-        elif stock['change_percent'] < 0:
-            price_class = "price-down"
+        elif price_change < 0:
+            price_color = "#FF4444"
             price_arrow = "↘"
         else:
-            price_class = "price-neutral"
+            price_color = "#FFFFFF"
             price_arrow = "→"
 
-        # Card styling
-        if stock['sentiment'] == 'bullish':
-            card_class = "trading-card"
-        elif stock['sentiment'] == 'bearish':
-            card_class = "bearish-card"
-        else:
-            card_class = "neutral-card"
+        # Emoji mapping
+        sentiment_emoji = {'bullish': '🚀', 'bearish': '📉', 'neutral': '😐'}[final_sentiment]
+
+        # Confidence calculation (average of available confidences)
+        confidences = []
+        if stock.get('confidence'):
+            confidences.append(stock['confidence'])
+        if show_enhanced:
+            ai_analysis = stock.get('enhanced_analysis', {}).get('ai_analysis', {})
+            ml_forecast = stock.get('enhanced_analysis', {}).get('ml_forecast', {})
+            if ai_analysis.get('confidence_score'):
+                confidences.append(ai_analysis['confidence_score'])
+            if ml_forecast.get('confidence'):
+                confidences.append(ml_forecast['confidence'])
+
+        avg_confidence = sum(confidences) / len(confidences) if confidences else stock.get('confidence', 0)
 
         price_display = f"${stock['current_price']:.2f}" if stock['current_price'] > 0 else "Price N/A"
 
-        # Clean card layout
+        # FIXED: Use Streamlit columns for better layout instead of complex HTML
+
+        # Card container with simple styling
         st.markdown(f"""
-        <div class="{card_class}">
-            <h2>{sentiment_emoji} {stock['ticker']} <span style="color: #888; font-size: 0.7em;">Score: {stock['opportunity_score']:.0f}/100</span></h2>
-            <p style="font-size: 1.3em; margin: 10px 0;"><span class="{price_class}">{price_display} {price_arrow} {stock['change_percent']:.1f}%</span></p>
-            <div style="display: flex; justify-content: space-between; margin: 15px 0;">
-                <div><strong>Sentiment:</strong> {stock['sentiment'].title()} ({stock['confidence']:.2f})</div>
-                <div><strong>Mentions:</strong> {stock['mention_count_24h']} (24h) | {stock['mention_count_1h']} (1h)</div>
+        <div style="background: linear-gradient(135deg, {card_color}, {card_color}DD); border: 2px solid {border_color}; border-radius: 12px; padding: 16px; margin: 8px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        """, unsafe_allow_html=True)
+
+        # Header row using Streamlit columns
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            st.markdown(f"""
+            <h3 style="margin: 0; color: {accent_color}; font-size: 1.4em;">
+                {sentiment_emoji} {stock['ticker']}
+            </h3>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown(f"""
+            <div style="text-align: right;">
+                <div style="font-size: 0.8em; color: #888;">Score: {stock['opportunity_score']:.0f}/100</div>
+                <div style="font-size: 1.1em; color: {price_color}; font-weight: bold;">
+                    {price_display} {price_arrow} {price_change:.1f}%
+                </div>
             </div>
-            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-top: 15px;">
-                <strong>Quick Play:</strong> 
-                {'🟢 CALLS - Bullish momentum detected' if stock['sentiment'] == 'bullish' 
-                 else '🔴 PUTS - Bearish sentiment strong' if stock['sentiment'] == 'bearish' 
-                 else '🟡 NEUTRAL - Wait for clearer signal'}
+            """, unsafe_allow_html=True)
+
+        # Stats row using Streamlit columns
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"""
+            <div style="font-size: 0.9em;">
+                <span style="color: #AAA;">Sentiment:</span> 
+                <span style="color: {accent_color};">{reddit_sentiment.title()}</span> 
+                <span style="color: #888;">({avg_confidence:.2f})</span>
             </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            mentions_text = f"{stock['mention_count_24h']} (24h)"
+            if stock['mention_count_1h'] > 0:
+                mentions_text += f" | {stock['mention_count_1h']} (1h)"
+
+            st.markdown(f"""
+            <div style="font-size: 0.9em; text-align: right;">
+                <span style="color: #AAA;">Mentions:</span> 
+                <span style="color: white;">{mentions_text}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Recommendation row
+        recommendation_text = (
+            'Strong bullish signals aligned' if final_sentiment == 'bullish'
+            else 'Strong bearish signals aligned' if final_sentiment == 'bearish'
+            else 'Mixed signals - consider waiting'
+        )
+
+        st.markdown(f"""
+        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; border-left: 4px solid {accent_color}; text-align: center; font-weight: bold; color: {accent_color}; margin-top: 12px;">
+            🎯 {final_recommendation}: {recommendation_text}
         </div>
         """, unsafe_allow_html=True)
 
-        # Enhanced analysis section (if requested)
+        # Close card container
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Enhanced analysis section (if requested) - COMPREHENSIVE VERSION
         if show_enhanced:
             enhanced_analysis = stock.get('enhanced_analysis', {})
             if enhanced_analysis and 'error' not in enhanced_analysis:
-                st.markdown(f"""
-                <div class="ai-analysis-section">
-                <h4>🤖 AI + ML Analysis for {stock['ticker']}</h4>
-                </div>
-                """, unsafe_allow_html=True)
 
                 # AI Analysis
                 ai_analysis = enhanced_analysis.get('ai_analysis', {})
-                if ai_analysis and 'error' not in ai_analysis:
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-                        overall_rating = ai_analysis.get('overall_rating', 'HOLD')
-                        confidence_score = ai_analysis.get('confidence_score', 0)
-                        st.metric("AI Rating", overall_rating, delta=f"{confidence_score:.0%} confidence")
-
-                    with col2:
-                        target_price = ai_analysis.get('target_price', 0)
-                        current_price = stock['current_price']
-                        upside = ((target_price - current_price) / current_price * 100) if current_price > 0 else 0
-                        st.metric("Target Price", f"${target_price:.2f}", delta=f"{upside:+.1f}% upside")
-
-                    with col3:
-                        options_rec = ai_analysis.get('options_strategy', {}).get('recommended_play', 'Hold')
-                        expiration = ai_analysis.get('options_strategy', {}).get('expiration', 'N/A')
-                        st.metric("Options Play", options_rec.upper(), delta=f"{expiration} exp")
-
-                # ML Forecast
                 ml_forecast = enhanced_analysis.get('ml_forecast', {})
-                if ml_forecast and 'error' not in ml_forecast:
+
+                if (ai_analysis and 'error' not in ai_analysis) or (ml_forecast and 'error' not in ml_forecast):
+
+                    # AI + ML header
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, #1a1a3a, #2d2d4d); border: 1px solid #4488FF; border-radius: 8px; padding: 12px; margin: 8px 0;">
+                    <div style="color: #4488FF; font-weight: bold; margin-bottom: 8px; font-size: 0.9em;">🤖 AI + ML Analysis</div>
+                    """, unsafe_allow_html=True)
+
+                    # Create metrics using Streamlit columns
                     col1, col2, col3 = st.columns(3)
 
                     with col1:
-                        price_change_pct = ml_forecast.get('price_change_pct', 0)
-                        direction = ml_forecast.get('direction', 'neutral')
-                        st.metric("ML Prediction", f"{price_change_pct:+.2f}%", delta=direction.upper())
+                        if ai_analysis and 'error' not in ai_analysis:
+                            ai_rating = ai_analysis.get('overall_rating', 'HOLD')
+                            ai_confidence = ai_analysis.get('confidence_score', 0)
+                            rating_color = "#00FF88" if ai_rating in ['STRONG_BUY',
+                                                                      'BUY'] else "#FF4444" if ai_rating in [
+                                'STRONG_SELL', 'SELL'] else "#888888"
+
+                            st.markdown(f"""
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.7em; color: #888;">AI Rating</div>
+                                <div style="font-size: 1.0em; color: {rating_color}; font-weight: bold;">{ai_rating}</div>
+                                <div style="font-size: 0.7em; color: #AAA;">{ai_confidence:.0%} conf</div>
+                            </div>
+                            """, unsafe_allow_html=True)
 
                     with col2:
-                        ml_confidence = ml_forecast.get('confidence', 0)
-                        magnitude = ml_forecast.get('magnitude', 'low')
-                        st.metric("ML Confidence", f"{ml_confidence:.0%}", delta=f"{magnitude} magnitude")
+                        if ml_forecast and 'error' not in ml_forecast:
+                            ml_direction = ml_forecast.get('direction', 'neutral')
+                            ml_confidence = ml_forecast.get('confidence', 0)
+                            ml_change = ml_forecast.get('price_change_pct', 0)
+                            ml_color = "#00FF88" if ml_direction == 'up' else "#FF4444" if ml_direction == 'down' else "#888888"
+                            ml_arrow = "↗" if ml_direction == 'up' else "↘" if ml_direction == 'down' else "→"
+
+                            st.markdown(f"""
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.7em; color: #888;">ML Forecast</div>
+                                <div style="font-size: 1.0em; color: {ml_color}; font-weight: bold;">{ml_change:+.1f}% {ml_arrow}</div>
+                                <div style="font-size: 0.7em; color: #AAA;">{ml_confidence:.0%} conf</div>
+                            </div>
+                            """, unsafe_allow_html=True)
 
                     with col3:
-                        predicted_price = ml_forecast.get('predicted_price', 0)
-                        st.metric("Predicted Price", f"${predicted_price:.2f}", delta="Next 1-5 days")
+                        if ai_analysis and 'error' not in ai_analysis:
+                            options_strategy = ai_analysis.get('options_strategy', {})
+                            recommended_play = options_strategy.get('recommended_play', 'hold')
+                            expiration = options_strategy.get('expiration', 'weekly')
+                            play_color = "#00FF88" if recommended_play == 'calls' else "#FF4444" if recommended_play == 'puts' else "#888888"
+
+                            st.markdown(f"""
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.7em; color: #888;">Options Play</div>
+                                <div style="font-size: 1.0em; color: {play_color}; font-weight: bold;">{recommended_play.upper()}</div>
+                                <div style="font-size: 0.7em; color: #AAA;">{expiration}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                    # Entry/Exit Price Recommendations
+                    if ai_analysis and 'error' not in ai_analysis:
+                        target_price = ai_analysis.get('target_price', 0)
+                        stop_loss = ai_analysis.get('stop_loss', 0)
+                        current_price = stock['current_price']
+
+                        if target_price > 0 and stop_loss > 0:
+                            upside = ((target_price - current_price) / current_price * 100) if current_price > 0 else 0
+                            downside = ((current_price - stop_loss) / current_price * 100) if current_price > 0 else 0
+
+                            st.markdown(f"""
+                            <div style="margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                                <div style="font-size: 0.8em; color: #4488FF; font-weight: bold; margin-bottom: 4px;">💰 Entry/Exit Targets</div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8em;">
+                                    <span style="color: #00FF88;">🎯 Target: ${target_price:.2f} (+{upside:.1f}%)</span>
+                                    <span style="color: #FF4444;">🛑 Stop: ${stop_loss:.2f} (-{downside:.1f}%)</span>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                    # Key Catalysts and Risk Factors
+                    if ai_analysis and 'error' not in ai_analysis:
+                        catalysts = ai_analysis.get('key_catalysts', [])
+                        risks = ai_analysis.get('risk_factors', [])
+
+                        if catalysts or risks:
+                            cat_col, risk_col = st.columns(2)
+
+                            with cat_col:
+                                if catalysts:
+                                    catalysts_text = " • ".join(catalysts[:2])  # Show first 2
+                                    st.markdown(f"""
+                                    <div style="margin-top: 8px; font-size: 0.7em;">
+                                        <div style="color: #00FF88; font-weight: bold;">📈 Catalysts:</div>
+                                        <div style="color: #AAA;">{catalysts_text}</div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+
+                            with risk_col:
+                                if risks:
+                                    risks_text = " • ".join(risks[:2])  # Show first 2
+                                    st.markdown(f"""
+                                    <div style="margin-top: 8px; font-size: 0.7em;">
+                                        <div style="color: #FF4444; font-weight: bold;">⚠️ Risks:</div>
+                                        <div style="color: #AAA;">{risks_text}</div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+
+                    # Executive Summary
+                    if ai_analysis and 'error' not in ai_analysis:
+                        summary = ai_analysis.get('executive_summary', '')
+                        if summary:
+                            st.markdown(f"""
+                            <div style="margin-top: 8px; padding: 6px; background: rgba(68,136,255,0.1); border-radius: 4px; font-size: 0.75em; color: #CCCCCC; font-style: italic;">
+                                💡 {summary}
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                    # Close AI + ML section
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+        # Sentiment Recap Section (always show if sentiment data exists)
+        sentiment_distribution = stock.get('sentiment_distribution', {})
+        if sentiment_distribution:
+            st.markdown(f"""
+            <div style="background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3); border-radius: 6px; padding: 8px; margin: 8px 0;">
+                <div style="color: #00FF88; font-weight: bold; font-size: 0.8em; margin-bottom: 4px;">📊 Sentiment Breakdown</div>
+                <div style="font-size: 0.7em; display: flex; justify-content: space-between;">
+                    <span style="color: #00FF88;">🐂 Bullish: {sentiment_distribution.get('bullish', 0)}</span>
+                    <span style="color: #888888;">😐 Neutral: {sentiment_distribution.get('neutral', 0)}</span>
+                    <span style="color: #FF4444;">🐻 Bearish: {sentiment_distribution.get('bearish', 0)}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Reddit Posts Links Section - REAL LINKS
+        reddit_posts = stock.get('reddit_posts', [])
+        if reddit_posts:
+            st.markdown(f"""
+            <div style="background: rgba(255,69,0,0.1); border: 1px solid rgba(255,69,0,0.3); border-radius: 6px; padding: 8px; margin: 8px 0;">
+                <div style="color: #FF4500; font-weight: bold; font-size: 0.8em; margin-bottom: 6px;">🔗 Recent Reddit Posts</div>
+            """, unsafe_allow_html=True)
+
+            for post in reddit_posts[:2]:  # Show top 2 posts
+                if post.get('permalink'):
+                    st.markdown(f"""
+                    <div style="margin: 4px 0;">
+                        <a href="{post['permalink']}" target="_blank" style="color: #FF6B35; font-size: 0.7em; text-decoration: none;">
+                            📝 {post['title']} (⬆️ {post['score']})
+                        </a>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="text-align: center; margin-top: 8px;">
+                <span style="color: #888888; font-size: 0.7em;">
+                    🔍 No recent Reddit posts found for {stock['ticker']}
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
     def render_main_interface(self):
-        """Render the main trading interface"""
+        """Render the main trading interface - UPDATED"""
 
-        # Clean header
-        st.markdown('<h1 class="main-header">💰 WSB Options Trader</h1>', unsafe_allow_html=True)
-        st.markdown('<p class="subtitle">Real-time Reddit sentiment • Options trading intelligence</p>', unsafe_allow_html=True)
+        # COMPACT header
+        st.markdown('<h1 style="text-align: center; color: #00FF88; margin-bottom: 0.5rem;">💰 WSB Options Trader</h1>', unsafe_allow_html=True)
+        st.markdown('<p style="text-align: center; color: #888; margin-bottom: 1rem;">Real-time Reddit sentiment • AI + ML trading intelligence</p>', unsafe_allow_html=True)
 
-        # Main action controls (prominent placement)
-        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+        # COMPACT action controls
+        col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
 
         with col1:
-            max_tickers = st.selectbox(
-                "📊 Analyze Top",
-                options=[5, 10, 15, 20],
-                index=1,
-                help="Number of top tickers to analyze"
-            )
+            max_tickers = st.selectbox("📊 Analyze", [5, 10, 15, 20], index=1)
 
         with col2:
-            analysis_mode = st.selectbox(
-                "🎯 Analysis Mode",
-                options=["Basic", "Advanced AI + ML"],
-                index=0,
-                help="Basic = Fast, Advanced = Detailed AI analysis"
-            )
+            analysis_mode = st.selectbox("🎯 Mode", ["Basic", "Advanced AI + ML"], index=0)
 
         with col3:
-            if st.button("🔄 Refresh Data", use_container_width=True):
+            if st.button("🔄", use_container_width=True, help="Refresh Data"):
                 self.firebase_manager.clear_cache()
                 st.cache_data.clear()
                 st.rerun()
 
         with col4:
-            # Simple quota indicator
+            # Compact quota indicator
             read_status = self.read_counter.get_status()
             quota_pct = (read_status['daily_reads'] / 35000) * 100
             if quota_pct > 80:
-                st.error(f"⚠️ {quota_pct:.0f}%")
+                st.error(f"⚠️{quota_pct:.0f}%")
             elif quota_pct > 50:
-                st.warning(f"📊 {quota_pct:.0f}%")
+                st.warning(f"📊{quota_pct:.0f}%")
             else:
-                st.success(f"✅ {quota_pct:.0f}%")
-
-        st.markdown("---")
+                st.success(f"✅{quota_pct:.0f}%")
 
         # Get data
         enable_advanced = (analysis_mode == "Advanced AI + ML")
 
-        with st.spinner("🔍 Loading trading opportunities..."):
+        with st.spinner("🔍 Loading opportunities..."):
             data = self.get_trading_opportunities(max_tickers)
 
         if 'error' in data:
             st.error(f"❌ Error loading data: {data['error']}")
             return
 
-        # Clean metrics row
+        # COMPACT metrics row
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("🔥 Hot Opportunities", len(data['hot_stocks']))
+            st.metric("🔥 Hot", len(data['hot_stocks']))
         with col2:
-            st.metric("🚀 Bullish Plays", len(data['bullish_plays']))
+            st.metric("🚀 Bulls", len(data['bullish_plays']))
         with col3:
-            st.metric("📉 Bearish Plays", len(data['bearish_plays']))
+            st.metric("📉 Bears", len(data['bearish_plays']))
         with col4:
-            st.metric("⚡ Momentum Plays", len(data['momentum_plays']))
-
-        st.markdown("---")
+            st.metric("⚡ Momentum", len(data['momentum_plays']))
 
         # Enhanced analysis for advanced mode
         opportunities = data['opportunities']
         if enable_advanced and ADVANCED_ANALYTICS_AVAILABLE:
-            st.info(f"🤖 Running advanced AI + ML analysis on top {min(5, len(opportunities))} opportunities...")
+            with st.spinner(f"🤖 Running AI + ML analysis on top {min(5, len(opportunities))} opportunities..."):
+                for i, opp in enumerate(opportunities[:5]):
+                    enhanced_analysis = self.get_enhanced_analysis(opp['ticker'], {
+                        'sentiment': opp['sentiment'],
+                        'confidence': opp['confidence'],
+                        'numerical_score': opp['numerical_score']
+                    })
+                    opportunities[i]['enhanced_analysis'] = enhanced_analysis
 
-            # Add enhanced analysis to top opportunities
-            for i, opp in enumerate(opportunities[:5]):  # Limit to top 5 for advanced
-                enhanced_analysis = self.get_enhanced_analysis(opp['ticker'], {
-                    'sentiment': opp['sentiment'],
-                    'confidence': opp['confidence'],
-                    'numerical_score': opp['numerical_score']
-                })
-                opportunities[i]['enhanced_analysis'] = enhanced_analysis
-
-        # Display opportunities
+        # Display opportunities in a more compact grid
         st.markdown("## 🎯 Top Trading Opportunities")
 
-        # Show top opportunities
-        display_count = min(8, len(opportunities))
+        # Show opportunities in 2 columns for better space usage
+        display_count = min(6, len(opportunities))  # Show fewer for better display
         for i in range(0, display_count, 2):
             col1, col2 = st.columns(2)
 
@@ -606,17 +817,18 @@ class CleanTradingDashboard:
                 if i + 1 < len(opportunities):
                     self.render_clean_opportunity_card(opportunities[i + 1], enable_advanced)
 
-        # Technical details in collapsible section (for power users)
-        with st.expander("🔧 Technical Details"):
+        # COMPACT technical details in collapsible section
+        with st.expander("🔧 Technical Details", expanded=False):
             read_status = data.get('read_status', {})
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.metric("Firebase Reads Today", f"{read_status.get('daily_reads', 0):,}")
+                st.metric("FB Reads", f"{read_status.get('daily_reads', 0):,}", help="Firebase reads today")
             with col2:
-                st.metric("Tickers Analyzed", data['max_tickers_used'])
+                st.metric("Analyzed", data['max_tickers_used'], help="Tickers analyzed")
             with col3:
-                st.metric("Data Freshness", "Live" if read_status.get('quota_healthy', True) else "Cached")
+                health = "🟢 Live" if read_status.get('quota_healthy', True) else "🟡 Cached"
+                st.metric("Data", health, help="Data freshness status")
 
     def run(self):
         """Run the clean dashboard"""

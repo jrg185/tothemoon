@@ -158,166 +158,212 @@ class FinancialSentimentAnalyzer:
             'bearish_keywords': bearish_count
         }
 
-    def analyze_llm_sentiment(self, text: str, ticker: str = None) -> Dict:
-        """Analyze sentiment using LLM for context-aware analysis - FIXED FOR GROK"""
-        if not self.use_llm:
-            return {'method': 'llm', 'sentiment': 'neutral', 'confidence': 0.0, 'error': 'LLM not available'}
+        def analyze_llm_sentiment(self, text: str, ticker: str = None) -> Dict:
+            """Analyze sentiment using LLM for context-aware analysis - FIXED FOR GROK"""
+            if not self.use_llm:
+                return {'method': 'llm', 'sentiment': 'neutral', 'confidence': 0.0, 'error': 'LLM not available'}
 
-        try:
-            ticker_context = f" about {ticker}" if ticker else ""
-
-            # GROK-SPECIFIC FIXES (same as ticker extractor)
-            provider = LLM_CONFIG['default_provider']
-
-            if provider == 'xai':
-                # Key fix: Much higher token limit for Grok reasoning models
-                max_tokens = 8000  # Increased from 300 to 8000
-                temperature = 0.0  # Lower temperature
-
-                # Simplified prompt to reduce reasoning overhead
-                prompt = f"""Analyze sentiment of: "{text}"{ticker_context}
-
-Respond with ONLY this JSON format:
-{{
-    "sentiment": "bullish|bearish|neutral",
-    "confidence": 0.0-1.0,
-    "reasoning": "brief explanation"
-}}"""
-
-                # FIXED: Only use parameters supported by Grok
-                extra_params = {
-                    'top_p': 0.1,  # More focused responses
-                    'stop': ['\n\n', '```', 'Note:', 'Explanation:']  # Stop reasoning early
-                    # REMOVED: frequency_penalty and presence_penalty - not supported by Grok
-                }
-            else:
-                # OpenAI settings (unchanged)
-                max_tokens = 300
-                temperature = 0.1
-                prompt = f"""Analyze the sentiment of this financial/trading text{ticker_context}:
-
-"{text}"
-
-Consider:
-1. Trading context (calls/puts, bull/bear, buy/sell signals)
-2. Financial keywords and slang
-3. Emojis and expressions
-4. Overall market sentiment
-
-Respond with ONLY a JSON object:
-{{
-    "sentiment": "bullish|bearish|neutral",
-    "confidence": 0.0-1.0,
-    "reasoning": "brief explanation",
-    "key_phrases": ["list", "of", "important", "phrases"]
-}}"""
-                extra_params = {}
-
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=[
-                    {"role": "system",
-                     "content": "You are a financial sentiment expert. Analyze trading sentiment accurately. Return ONLY valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=30,  # Longer timeout for reasoning models
-                **extra_params
-            )
-
-            # Get raw response
-            raw_content = response.choices[0].message.content
-            finish_reason = response.choices[0].finish_reason
-            completion_tokens = response.usage.completion_tokens if hasattr(response, 'usage') else 0
-
-            # Enhanced debugging for Grok
-            if provider == 'xai':
-                logger.debug(f"Grok sentiment response - finish_reason: {finish_reason}, completion_tokens: {completion_tokens}")
-                logger.debug(f"Raw Grok response: {repr(raw_content)}")
-
-            if not raw_content or not raw_content.strip():
-                logger.warning(f"Empty response from LLM sentiment - finish_reason: {finish_reason}, completion_tokens: {completion_tokens}")
-
-                # If still hitting limits with Grok, try ultra-minimal approach
-                if provider == 'xai' and finish_reason == 'length' and completion_tokens == 0:
-                    logger.info("Attempting ultra-minimal Grok sentiment analysis...")
-                    minimal_result = self._ultra_minimal_grok_sentiment(text, ticker)
-                    return minimal_result
-
-                return {'method': 'llm', 'sentiment': 'neutral', 'confidence': 0.0, 'error': 'Empty response'}
-
-            # Clean the response - remove markdown and extra formatting
-            content = raw_content.strip()
-
-            # Remove markdown code blocks if they exist
-            if content.startswith('```json'):
-                content = content[7:]  # Remove ```json
-            elif content.startswith('```'):
-                content = content[3:]  # Remove ```
-
-            if content.endswith('```'):
-                content = content[:-3]  # Remove trailing ```
-
-            content = content.strip()
-
-            # Find JSON object boundaries
-            start_idx = content.find('{')
-            end_idx = content.rfind('}')
-
-            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                content = content[start_idx:end_idx + 1]
-            else:
-                logger.warning(f"No JSON object found in sentiment response: {repr(content)}")
-                # Try to extract sentiment from text
-                return self._extract_sentiment_from_text(raw_content)
-
-            logger.debug(f"Cleaned content for JSON parsing: {repr(content)}")
-
-            # Parse JSON
             try:
-                result = json.loads(content)
+                ticker_context = f" about {ticker}" if ticker else ""
 
-                # Validate the result has required keys
-                if not isinstance(result, dict):
-                    logger.warning(f"LLM returned non-dict: {type(result)} - {result}")
-                    return {'method': 'llm', 'sentiment': 'neutral', 'confidence': 0.0, 'error': 'Invalid response format'}
+                # GROK-SPECIFIC FIXES (same as ticker extractor)
+                provider = LLM_CONFIG['default_provider']
 
-                # Ensure required keys exist with defaults
-                result.setdefault('sentiment', 'neutral')
-                result.setdefault('confidence', 0.0)
-                result.setdefault('reasoning', 'No reasoning provided')
-                result.setdefault('key_phrases', [])
+                if provider == 'xai':
+                    # Key fix: Much higher token limit for Grok reasoning models
+                    max_tokens = 8000  # Increased from 300 to 8000
+                    temperature = 0.0  # Lower temperature
 
-                # Validate sentiment value
-                if result['sentiment'] not in ['bullish', 'bearish', 'neutral']:
-                    result['sentiment'] = 'neutral'
+                    # Simplified prompt to reduce reasoning overhead
+                    prompt = f"""Analyze sentiment of: "{text}"{ticker_context}
 
-                # Validate confidence is a number between 0 and 1
+    Respond with ONLY this JSON format:
+    {{
+        "sentiment": "bullish|bearish|neutral",
+        "confidence": 0.0-1.0,
+        "reasoning": "brief explanation"
+    }}"""
+
+                    # FIXED: Only use parameters supported by Grok - REMOVED stop parameter
+                    extra_params = {
+                        'top_p': 0.1,  # More focused responses
+                        # REMOVED: stop parameter that was causing 400 errors
+                        # REMOVED: frequency_penalty and presence_penalty - not supported by Grok
+                    }
+                else:
+                    # OpenAI settings (unchanged)
+                    max_tokens = 300
+                    temperature = 0.1
+                    prompt = f"""Analyze the sentiment of this financial/trading text{ticker_context}:
+
+    "{text}"
+
+    Consider:
+    1. Trading context (calls/puts, bull/bear, buy/sell signals)
+    2. Financial keywords and slang
+    3. Emojis and expressions
+    4. Overall market sentiment
+
+    Respond with ONLY a JSON object:
+    {{
+        "sentiment": "bullish|bearish|neutral",
+        "confidence": 0.0-1.0,
+        "reasoning": "brief explanation",
+        "key_phrases": ["list", "of", "important", "phrases"]
+    }}"""
+                    extra_params = {}
+
+                response = self.llm_client.chat.completions.create(
+                    model=self.llm_model,
+                    messages=[
+                        {"role": "system",
+                         "content": "You are a financial sentiment expert. Analyze trading sentiment accurately. Return ONLY valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=30,  # Longer timeout for reasoning models
+                    **extra_params
+                )
+
+                # Get raw response
+                raw_content = response.choices[0].message.content
+                finish_reason = response.choices[0].finish_reason
+                completion_tokens = response.usage.completion_tokens if hasattr(response, 'usage') else 0
+
+                # Enhanced debugging for Grok
+                if provider == 'xai':
+                    logger.debug(
+                        f"Grok sentiment response - finish_reason: {finish_reason}, completion_tokens: {completion_tokens}")
+                    logger.debug(f"Raw Grok response: {repr(raw_content)}")
+
+                if not raw_content or not raw_content.strip():
+                    logger.warning(
+                        f"Empty response from LLM sentiment - finish_reason: {finish_reason}, completion_tokens: {completion_tokens}")
+
+                    # If still hitting limits with Grok, try ultra-minimal approach
+                    if provider == 'xai' and finish_reason == 'length' and completion_tokens == 0:
+                        logger.info("Attempting ultra-minimal Grok sentiment analysis...")
+                        minimal_result = self._ultra_minimal_grok_sentiment(text, ticker)
+                        return minimal_result
+
+                    return {'method': 'llm', 'sentiment': 'neutral', 'confidence': 0.0, 'error': 'Empty response'}
+
+                # Clean the response - remove markdown and extra formatting
+                content = raw_content.strip()
+
+                # Remove markdown code blocks if they exist
+                if content.startswith('```json'):
+                    content = content[7:]  # Remove ```json
+                elif content.startswith('```'):
+                    content = content[3:]  # Remove ```
+
+                if content.endswith('```'):
+                    content = content[:-3]  # Remove trailing ```
+
+                content = content.strip()
+
+                # Find JSON object boundaries
+                start_idx = content.find('{')
+                end_idx = content.rfind('}')
+
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    content = content[start_idx:end_idx + 1]
+                else:
+                    logger.warning(f"No JSON object found in sentiment response: {repr(content)}")
+                    # Try to extract sentiment from text
+                    return self._extract_sentiment_from_text(raw_content)
+
+                logger.debug(f"Cleaned content for JSON parsing: {repr(content)}")
+
+                # Parse JSON
                 try:
-                    confidence = float(result['confidence'])
-                    result['confidence'] = max(0.0, min(1.0, confidence))
-                except (ValueError, TypeError):
-                    result['confidence'] = 0.0
+                    result = json.loads(content)
 
-                result['method'] = 'llm'
-                return result
+                    # Validate the result has required keys
+                    if not isinstance(result, dict):
+                        logger.warning(f"LLM returned non-dict: {type(result)} - {result}")
+                        return {'method': 'llm', 'sentiment': 'neutral', 'confidence': 0.0,
+                                'error': 'Invalid response format'}
 
-            except json.JSONDecodeError as json_error:
-                logger.warning(f"JSON decode error for sentiment analysis: {json_error}")
-                logger.warning(f"Content that failed to parse: {repr(content)}")
+                    # Ensure required keys exist with defaults
+                    result.setdefault('sentiment', 'neutral')
+                    result.setdefault('confidence', 0.0)
+                    result.setdefault('reasoning', 'No reasoning provided')
+                    result.setdefault('key_phrases', [])
 
-                # Fallback to text extraction
-                return self._extract_sentiment_from_text(raw_content)
+                    # Validate sentiment value
+                    if result['sentiment'] not in ['bullish', 'bearish', 'neutral']:
+                        result['sentiment'] = 'neutral'
 
-        except Exception as e:
-            logger.warning(f"LLM sentiment analysis failed: {e}")
-            return {
-                'method': 'llm',
-                'sentiment': 'neutral',
-                'confidence': 0.0,
-                'error': str(e)
-            }
+                    # Validate confidence is a number between 0 and 1
+                    try:
+                        confidence = float(result['confidence'])
+                        result['confidence'] = max(0.0, min(1.0, confidence))
+                    except (ValueError, TypeError):
+                        result['confidence'] = 0.0
+
+                    result['method'] = 'llm'
+                    return result
+
+                except json.JSONDecodeError as json_error:
+                    logger.warning(f"JSON decode error for sentiment analysis: {json_error}")
+                    logger.warning(f"Content that failed to parse: {repr(content)}")
+
+                    # Fallback to text extraction
+                    return self._extract_sentiment_from_text(raw_content)
+
+            except Exception as e:
+                logger.warning(f"LLM sentiment analysis failed: {e}")
+                return {
+                    'method': 'llm',
+                    'sentiment': 'neutral',
+                    'confidence': 0.0,
+                    'error': str(e)
+                }
+
+        def _ultra_minimal_grok_sentiment(self, text: str, ticker: str = None) -> Dict:
+            """Ultra-minimal sentiment analysis when Grok consumes all tokens for reasoning"""
+            try:
+                # Absolute minimal prompt to bypass reasoning overhead
+                simple_prompt = f"Sentiment of '{text}': bullish/bearish/neutral"
+
+                response = self.llm_client.chat.completions.create(
+                    model=self.llm_model,
+                    messages=[{"role": "user", "content": simple_prompt}],
+                    max_tokens=8000,  # Very high token limit
+                    temperature=0.0,
+                    top_p=0.05,  # Very focused
+                    # REMOVED stop parameter that was causing 400 errors
+                    timeout=45
+                )
+
+                content = response.choices[0].message.content
+                logger.info(f"Ultra-minimal Grok sentiment response: {repr(content)}")
+
+                if content and content.strip():
+                    content_lower = content.lower()
+                    if 'bullish' in content_lower:
+                        sentiment = 'bullish'
+                        confidence = 0.6
+                    elif 'bearish' in content_lower:
+                        sentiment = 'bearish'
+                        confidence = 0.6
+                    else:
+                        sentiment = 'neutral'
+                        confidence = 0.5
+
+                    return {
+                        'method': 'llm',
+                        'sentiment': sentiment,
+                        'confidence': confidence,
+                        'reasoning': f'Ultra-minimal analysis: {content[:50]}'
+                    }
+
+            except Exception as e:
+                logger.error(f"Ultra-minimal sentiment analysis failed: {e}")
+
+            return {'method': 'llm', 'sentiment': 'neutral', 'confidence': 0.0, 'error': 'All methods failed'}
 
     def _ultra_minimal_grok_sentiment(self, text: str, ticker: str = None) -> Dict:
         """Ultra-minimal sentiment analysis when Grok consumes all tokens for reasoning"""
