@@ -1,6 +1,6 @@
 """
-ML Price Forecasting Engine
-Advanced machine learning models for stock price prediction using multiple data sources
+ML Price Forecasting Engine - FIXED with yfinance
+Replace your existing ml_price_forecaster.py with this version
 """
 
 import sys
@@ -13,33 +13,31 @@ sys.path.insert(0, str(project_root))
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone, timedelta
-import requests
 import time
 import logging
-import pickle
 import warnings
 from typing import Dict, List, Tuple, Optional
-import json
 
 # ML Libraries
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.preprocessing import StandardScaler, RobustScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.model_selection import TimeSeriesSplit, cross_val_score
-import xgboost as xgb
-from scipy import stats
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import TimeSeriesSplit
 
-# Deep Learning (if torch is available)
 try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    from torch.utils.data import DataLoader, TensorDataset
-
-    TORCH_AVAILABLE = True
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
 except ImportError:
-    TORCH_AVAILABLE = False
-    warnings.warn("PyTorch not available, LSTM models will be disabled")
+    XGBOOST_AVAILABLE = False
+    warnings.warn("XGBoost not available")
+
+# yfinance for historical data
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+    print("✅ yfinance available")
+except ImportError:
+    YFINANCE_AVAILABLE = False
+    print("❌ yfinance not available - install with: pip install yfinance")
 
 from config.settings import FINANCIAL_APIS
 
@@ -48,656 +46,462 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class FeatureEngineer:
-    """Advanced feature engineering for price prediction"""
-
-    def __init__(self):
-        self.scaler = RobustScaler()
-        self.fitted = False
-
-    def calculate_technical_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate comprehensive technical indicators"""
-
-        # Price-based indicators
-        df['sma_5'] = df['close'].rolling(window=5).mean()
-        df['sma_10'] = df['close'].rolling(window=10).mean()
-        df['sma_20'] = df['close'].rolling(window=20).mean()
-        df['sma_50'] = df['close'].rolling(window=50).mean()
-
-        # Exponential moving averages
-        df['ema_12'] = df['close'].ewm(span=12).mean()
-        df['ema_26'] = df['close'].ewm(span=26).mean()
-
-        # MACD
-        df['macd'] = df['ema_12'] - df['ema_26']
-        df['macd_signal'] = df['macd'].ewm(span=9).mean()
-        df['macd_histogram'] = df['macd'] - df['macd_signal']
-
-        # RSI
-        delta = df['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        df['rsi'] = 100 - (100 / (1 + rs))
-
-        # Bollinger Bands
-        bb_window = 20
-        bb_std = 2
-        df['bb_middle'] = df['close'].rolling(window=bb_window).mean()
-        bb_std_dev = df['close'].rolling(window=bb_window).std()
-        df['bb_upper'] = df['bb_middle'] + (bb_std_dev * bb_std)
-        df['bb_lower'] = df['bb_middle'] - (bb_std_dev * bb_std)
-        df['bb_width'] = df['bb_upper'] - df['bb_lower']
-        df['bb_position'] = (df['close'] - df['bb_lower']) / df['bb_width']
-
-        # Volatility indicators
-        df['volatility_10'] = df['close'].rolling(window=10).std()
-        df['volatility_20'] = df['close'].rolling(window=20).std()
-
-        # Price momentum
-        df['momentum_5'] = df['close'] / df['close'].shift(5) - 1
-        df['momentum_10'] = df['close'] / df['close'].shift(10) - 1
-        df['momentum_20'] = df['close'] / df['close'].shift(20) - 1
-
-        # Volume indicators
-        if 'volume' in df.columns:
-            df['volume_sma_10'] = df['volume'].rolling(window=10).mean()
-            df['volume_ratio'] = df['volume'] / df['volume_sma_10']
-            df['price_volume'] = df['close'] * df['volume']
-
-        # Price action features
-        df['high_low_ratio'] = df['high'] / df['low']
-        df['close_open_ratio'] = df['close'] / df['open']
-        df['range_pct'] = (df['high'] - df['low']) / df['close']
-
-        # Support/Resistance levels
-        df['resistance_20'] = df['high'].rolling(window=20).max()
-        df['support_20'] = df['low'].rolling(window=20).min()
-        df['distance_to_resistance'] = (df['resistance_20'] - df['close']) / df['close']
-        df['distance_to_support'] = (df['close'] - df['support_20']) / df['close']
-
-        return df
-
-    def add_lag_features(self, df: pd.DataFrame, lags: List[int] = [1, 2, 3, 5, 10]) -> pd.DataFrame:
-        """Add lagged features for time series modeling"""
-
-        for lag in lags:
-            df[f'close_lag_{lag}'] = df['close'].shift(lag)
-            df[f'volume_lag_{lag}'] = df['volume'].shift(lag) if 'volume' in df.columns else 0
-            df[f'return_lag_{lag}'] = df['close'].pct_change().shift(lag)
-
-        return df
-
-    def add_market_features(self, df: pd.DataFrame, market_data: Dict) -> pd.DataFrame:
-        """Add market-wide features"""
-
-        # Time-based features
-        df['day_of_week'] = pd.to_datetime(df.index).dayofweek
-        df['month'] = pd.to_datetime(df.index).month
-        df['quarter'] = pd.to_datetime(df.index).quarter
-
-        # Market regime features (if market data available)
-        if market_data:
-            # VIX levels, market trends, etc.
-            df['market_trend'] = market_data.get('market_trend', 0)
-            df['vix_level'] = market_data.get('vix', 20)
-            df['sector_performance'] = market_data.get('sector_performance', 0)
-
-        return df
-
-    def add_sentiment_features(self, df: pd.DataFrame, sentiment_data: List[Dict]) -> pd.DataFrame:
-        """Add sentiment-based features"""
-
-        # Convert sentiment data to DataFrame
-        if sentiment_data:
-            sentiment_df = pd.DataFrame(sentiment_data)
-            sentiment_df['date'] = pd.to_datetime(sentiment_df['timestamp']).dt.date
-
-            # Aggregate daily sentiment
-            daily_sentiment = sentiment_df.groupby('date').agg({
-                'numerical_score': ['mean', 'std', 'count'],
-                'confidence': 'mean',
-                'mention_count': 'sum'
-            }).reset_index()
-
-            # Flatten column names
-            daily_sentiment.columns = ['date', 'sentiment_mean', 'sentiment_std', 'sentiment_count',
-                                       'confidence_mean', 'mention_count_total']
-
-            # Add sentiment change rate
-            daily_sentiment['sentiment_change'] = daily_sentiment['sentiment_mean'].diff()
-            daily_sentiment['mention_momentum'] = daily_sentiment['mention_count_total'].pct_change()
-
-            # Merge with price data
-            df_reset = df.reset_index()
-            df_reset['date'] = pd.to_datetime(df_reset['date']).dt.date
-
-            merged = pd.merge(df_reset, daily_sentiment, on='date', how='left')
-            merged = merged.set_index('date')
-
-            # Fill missing sentiment data
-            sentiment_cols = ['sentiment_mean', 'sentiment_std', 'sentiment_count',
-                              'confidence_mean', 'mention_count_total', 'sentiment_change', 'mention_momentum']
-            for col in sentiment_cols:
-                if col in merged.columns:
-                    df[col] = merged[col].fillna(0)
-
-        return df
-
-    def engineer_features(self, df: pd.DataFrame, sentiment_data: List[Dict] = None,
-                          market_data: Dict = None) -> pd.DataFrame:
-        """Complete feature engineering pipeline"""
-
-        logger.info("Starting feature engineering...")
-
-        # Technical indicators
-        df = self.calculate_technical_indicators(df)
-
-        # Lag features
-        df = self.add_lag_features(df)
-
-        # Market features
-        df = self.add_market_features(df, market_data or {})
-
-        # Sentiment features
-        if sentiment_data:
-            df = self.add_sentiment_features(df, sentiment_data)
-
-        # Target variable (next day return)
-        df['target_return'] = df['close'].shift(-1) / df['close'] - 1
-        df['target_price'] = df['close'].shift(-1)
-
-        # Remove rows with NaN values
-        initial_rows = len(df)
-        df = df.dropna()
-        final_rows = len(df)
-
-        logger.info(f"Feature engineering complete: {initial_rows} -> {final_rows} rows")
-        logger.info(f"Features created: {len(df.columns)} total columns")
-
-        return df
-
-
-class LSTMModel(nn.Module):
-    """LSTM model for time series forecasting"""
-
-    def __init__(self, input_size: int, hidden_size: int = 64, num_layers: int = 2,
-                 dropout: float = 0.2, output_size: int = 1):
-        super(LSTMModel, self).__init__()
-
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
-                            batch_first=True, dropout=dropout)
-        self.dropout = nn.Dropout(dropout)
-        self.linear = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        # LSTM forward pass
-        lstm_out, _ = self.lstm(x)
-
-        # Take the last output
-        last_output = lstm_out[:, -1, :]
-
-        # Apply dropout and linear layer
-        output = self.dropout(last_output)
-        output = self.linear(output)
-
-        return output
-
-
 class MLPriceForecaster:
-    """Advanced ML-based price forecasting system"""
+    """ML forecaster using yfinance instead of Alpha Vantage"""
 
     def __init__(self):
         """Initialize the ML forecaster"""
 
-        self.feature_engineer = FeatureEngineer()
+        # Check data availability
+        if not YFINANCE_AVAILABLE:
+            logger.warning("yfinance not available - ML forecaster will be limited")
+
+        # Models storage
         self.models = {}
         self.scalers = {}
         self.model_performance = {}
 
-        # Financial APIs
-        self.finnhub_key = FINANCIAL_APIS.get('finnhub')
-        self.alpha_vantage_key = FINANCIAL_APIS.get('alpha_vantage')
-
-        # Model configurations
+        # Model configurations (simplified for reliability)
         self.model_configs = {
             'random_forest': {
-                'n_estimators': 100,
-                'max_depth': 10,
+                'n_estimators': 50,
+                'max_depth': 8,
                 'min_samples_split': 5,
                 'random_state': 42
             },
-            'xgboost': {
-                'n_estimators': 100,
-                'max_depth': 6,
-                'learning_rate': 0.1,
-                'random_state': 42
-            },
             'gradient_boosting': {
-                'n_estimators': 100,
+                'n_estimators': 50,
                 'max_depth': 6,
                 'learning_rate': 0.1,
                 'random_state': 42
             }
         }
 
-        logger.info("ML Price Forecaster initialized")
+        if XGBOOST_AVAILABLE:
+            self.model_configs['xgboost'] = {
+                'n_estimators': 50,
+                'max_depth': 6,
+                'learning_rate': 0.1,
+                'random_state': 42,
+                'verbosity': 0  # Reduce XGBoost logging
+            }
+
+        logger.info("ML Price Forecaster initialized with yfinance")
 
     def get_historical_data(self, ticker: str, days: int = 252) -> pd.DataFrame:
-        """Get historical price data"""
+        """Get historical data using yfinance (FIXED VERSION)"""
+
+        if not YFINANCE_AVAILABLE:
+            logger.error("yfinance not available - cannot get historical data")
+            return pd.DataFrame()
 
         try:
-            if not self.alpha_vantage_key:
-                raise ValueError("Alpha Vantage API key not configured")
+            logger.info(f"Fetching {ticker} data using yfinance...")
 
-            # Get daily data
-            url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={ticker}&outputsize=full&apikey={self.alpha_vantage_key}"
-            response = requests.get(url, timeout=30)
+            # Calculate period based on days requested
+            if days <= 30:
+                period = "1mo"
+            elif days <= 90:
+                period = "3mo"
+            elif days <= 180:
+                period = "6mo"
+            elif days <= 365:
+                period = "1y"
+            else:
+                period = "2y"
 
-            if response.status_code != 200:
-                raise ValueError(f"API request failed: {response.status_code}")
+            # Create ticker object and fetch data
+            ticker_obj = yf.Ticker(ticker)
+            hist = ticker_obj.history(period=period)
 
-            data = response.json()
+            if hist.empty:
+                logger.warning(f"No data returned for {ticker} from yfinance")
+                return pd.DataFrame()
 
-            if 'Time Series (Daily)' not in data:
-                raise ValueError(f"No data returned for {ticker}")
+            # Convert to expected format (matching your original structure)
+            df = pd.DataFrame({
+                'open': hist['Open'],
+                'high': hist['High'],
+                'low': hist['Low'],
+                'close': hist['Close'],
+                'volume': hist['Volume']
+            })
 
-            time_series = data['Time Series (Daily)']
+            # Keep the datetime index
+            df.index = hist.index
 
-            # Convert to DataFrame
-            df_data = []
-            for date, values in time_series.items():
-                df_data.append({
-                    'date': pd.to_datetime(date),
-                    'open': float(values['1. open']),
-                    'high': float(values['2. high']),
-                    'low': float(values['3. low']),
-                    'close': float(values['4. close']),
-                    'volume': float(values['5. volume'])
-                })
-
-            df = pd.DataFrame(df_data)
-            df = df.sort_values('date').set_index('date')
-
-            # Limit to requested days
+            # Limit to requested number of days
             df = df.tail(days)
 
-            logger.info(f"Retrieved {len(df)} days of data for {ticker}")
+            # Remove any rows with NaN values
+            df = df.dropna()
+
+            logger.info(f"✅ Retrieved {len(df)} days of data for {ticker} from yfinance")
+
+            if len(df) > 0:
+                latest_close = df['close'].iloc[-1]
+                logger.info(f"   Latest close price: ${latest_close:.2f}")
+
             return df
 
         except Exception as e:
-            logger.error(f"Error getting historical data for {ticker}: {e}")
+            logger.error(f"❌ yfinance failed for {ticker}: {e}")
             return pd.DataFrame()
 
-    def prepare_training_data(self, df: pd.DataFrame, sequence_length: int = 10) -> Tuple[np.ndarray, np.ndarray]:
-        """Prepare data for training"""
+    def calculate_technical_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Calculate technical indicators for ML features"""
 
-        # Select feature columns (exclude target columns and date)
-        feature_cols = [col for col in df.columns if not col.startswith('target_') and col != 'date']
+        try:
+            # Simple Moving Averages
+            df['sma_5'] = df['close'].rolling(window=5).mean()
+            df['sma_10'] = df['close'].rolling(window=10).mean()
+            df['sma_20'] = df['close'].rolling(window=20).mean()
 
-        X = df[feature_cols].values
+            # Price momentum
+            df['momentum_5'] = df['close'].pct_change(5)
+            df['momentum_10'] = df['close'].pct_change(10)
+
+            # Volatility
+            df['volatility_10'] = df['close'].rolling(window=10).std()
+            df['volatility_20'] = df['close'].rolling(window=20).std()
+
+            # Price position in recent range
+            df['high_20'] = df['high'].rolling(window=20).max()
+            df['low_20'] = df['low'].rolling(window=20).min()
+            df['price_position'] = (df['close'] - df['low_20']) / (df['high_20'] - df['low_20'])
+
+            # Volume indicators
+            df['volume_sma_10'] = df['volume'].rolling(window=10).mean()
+            df['volume_ratio'] = df['volume'] / df['volume_sma_10']
+
+            # RSI (simplified)
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['rsi'] = 100 - (100 / (1 + rs))
+
+            # Lag features
+            df['close_lag_1'] = df['close'].shift(1)
+            df['close_lag_5'] = df['close'].shift(5)
+            df['volume_lag_1'] = df['volume'].shift(1)
+
+            # Target variable (next day return)
+            df['target_return'] = df['close'].shift(-1) / df['close'] - 1
+
+            return df
+
+        except Exception as e:
+            logger.error(f"Error calculating technical indicators: {e}")
+            return df
+
+    def prepare_training_data(self, df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, StandardScaler, List[str]]:
+        """Prepare data for ML training"""
+
+        # Feature columns (exclude target and non-feature columns)
+        feature_cols = [
+            'sma_5', 'sma_10', 'sma_20',
+            'momentum_5', 'momentum_10',
+            'volatility_10', 'volatility_20',
+            'price_position', 'volume_ratio', 'rsi',
+            'close_lag_1', 'close_lag_5', 'volume_lag_1'
+        ]
+
+        # Only use columns that exist and have data
+        available_cols = [col for col in feature_cols if col in df.columns and not df[col].isna().all()]
+
+        if not available_cols:
+            raise ValueError("No valid feature columns available")
+
+        logger.info(f"Using {len(available_cols)} features: {available_cols}")
+
+        # Prepare features and target
+        X = df[available_cols].values
         y = df['target_return'].values
+
+        # Remove rows with NaN values
+        valid_rows = ~(np.isnan(X).any(axis=1) | np.isnan(y))
+        X = X[valid_rows]
+        y = y[valid_rows]
+
+        if len(X) < 30:
+            raise ValueError(f"Insufficient data after cleaning: {len(X)} rows")
 
         # Scale features
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        # For LSTM, create sequences
-        X_sequences = []
-        y_sequences = []
+        logger.info(f"Prepared training data: {X_scaled.shape[0]} samples, {X_scaled.shape[1]} features")
 
-        for i in range(sequence_length, len(X_scaled)):
-            X_sequences.append(X_scaled[i - sequence_length:i])
-            y_sequences.append(y[i])
-
-        return np.array(X_sequences), np.array(y_sequences), scaler
-
-    def train_traditional_models(self, X: np.ndarray, y: np.ndarray) -> Dict:
-        """Train traditional ML models"""
-
-        models = {}
-        performance = {}
-
-        # Reshape X for traditional models (use last observation in sequence)
-        X_2d = X[:, -1, :] if len(X.shape) == 3 else X
-
-        # Time series split for validation
-        tscv = TimeSeriesSplit(n_splits=3)
-
-        for model_name, config in self.model_configs.items():
-            try:
-                logger.info(f"Training {model_name}...")
-
-                if model_name == 'random_forest':
-                    model = RandomForestRegressor(**config)
-                elif model_name == 'xgboost':
-                    model = xgb.XGBRegressor(**config)
-                elif model_name == 'gradient_boosting':
-                    model = GradientBoostingRegressor(**config)
-
-                # Cross-validation
-                cv_scores = cross_val_score(model, X_2d, y, cv=tscv,
-                                            scoring='neg_mean_squared_error')
-
-                # Train on full dataset
-                model.fit(X_2d, y)
-
-                # Store model and performance
-                models[model_name] = model
-                performance[model_name] = {
-                    'cv_mse': -cv_scores.mean(),
-                    'cv_std': cv_scores.std(),
-                    'train_score': model.score(X_2d, y)
-                }
-
-                logger.info(f"{model_name} - CV MSE: {-cv_scores.mean():.6f} (+/- {cv_scores.std() * 2:.6f})")
-
-            except Exception as e:
-                logger.error(f"Error training {model_name}: {e}")
-
-        return models, performance
-
-    def train_lstm_model(self, X: np.ndarray, y: np.ndarray) -> Tuple[Optional[LSTMModel], Dict]:
-        """Train LSTM model"""
-
-        if not TORCH_AVAILABLE:
-            logger.warning("PyTorch not available, skipping LSTM training")
-            return None, {}
-
-        try:
-            logger.info("Training LSTM model...")
-
-            # Split data
-            train_size = int(0.8 * len(X))
-            X_train, X_test = X[:train_size], X[train_size:]
-            y_train, y_test = y[:train_size], y[train_size:]
-
-            # Convert to tensors
-            X_train_tensor = torch.FloatTensor(X_train)
-            y_train_tensor = torch.FloatTensor(y_train).view(-1, 1)
-            X_test_tensor = torch.FloatTensor(X_test)
-            y_test_tensor = torch.FloatTensor(y_test).view(-1, 1)
-
-            # Create data loaders
-            train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-            train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False)
-
-            # Initialize model
-            input_size = X.shape[2]
-            model = LSTMModel(input_size=input_size, hidden_size=64, num_layers=2)
-
-            # Training setup
-            criterion = nn.MSELoss()
-            optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-            # Training loop
-            model.train()
-            for epoch in range(50):
-                total_loss = 0
-                for batch_X, batch_y in train_loader:
-                    optimizer.zero_grad()
-                    outputs = model(batch_X)
-                    loss = criterion(outputs, batch_y)
-                    loss.backward()
-                    optimizer.step()
-                    total_loss += loss.item()
-
-                if epoch % 10 == 0:
-                    logger.info(f"LSTM Epoch {epoch}, Loss: {total_loss / len(train_loader):.6f}")
-
-            # Evaluate
-            model.eval()
-            with torch.no_grad():
-                train_pred = model(X_train_tensor)
-                test_pred = model(X_test_tensor)
-
-                train_mse = criterion(train_pred, y_train_tensor).item()
-                test_mse = criterion(test_pred, y_test_tensor).item()
-
-            performance = {
-                'train_mse': train_mse,
-                'test_mse': test_mse,
-                'train_r2': r2_score(y_train, train_pred.numpy().flatten()),
-                'test_r2': r2_score(y_test, test_pred.numpy().flatten())
-            }
-
-            logger.info(f"LSTM - Train MSE: {train_mse:.6f}, Test MSE: {test_mse:.6f}")
-
-            return model, performance
-
-        except Exception as e:
-            logger.error(f"Error training LSTM: {e}")
-            return None, {}
+        return X_scaled, y, scaler, available_cols
 
     def train_models(self, ticker: str, sentiment_data: List[Dict] = None,
                      market_data: Dict = None) -> Dict:
-        """Train all models for a ticker"""
+        """Train ML models for a ticker"""
 
-        logger.info(f"Training models for {ticker}")
+        logger.info(f"🤖 Training models for {ticker}")
 
         try:
-            # Get historical data
-            df = self.get_historical_data(ticker, days=500)
+            # Get historical data using yfinance
+            df = self.get_historical_data(ticker, days=200)
+
             if df.empty:
                 raise ValueError("No historical data available")
 
-            # Feature engineering
-            df = self.feature_engineer.engineer_features(df, sentiment_data, market_data)
-
-            if len(df) < 50:
-                raise ValueError("Insufficient data after feature engineering")
+            # Calculate technical indicators
+            df = self.calculate_technical_indicators(df)
 
             # Prepare training data
-            X, y, scaler = self.prepare_training_data(df)
+            X, y, scaler, feature_cols = self.prepare_training_data(df)
 
-            # Train traditional models
-            traditional_models, traditional_performance = self.train_traditional_models(X, y)
+            # Train models
+            models = {}
+            performance = {}
 
-            # Train LSTM model
-            lstm_model, lstm_performance = self.train_lstm_model(X, y)
+            # Split data (80% train, 20% test)
+            split_idx = int(0.8 * len(X))
+            X_train, X_test = X[:split_idx], X[split_idx:]
+            y_train, y_test = y[:split_idx], y[split_idx:]
 
-            # Store models and performance
+            for model_name, config in self.model_configs.items():
+                try:
+                    logger.info(f"   Training {model_name}...")
+
+                    # Initialize model
+                    if model_name == 'random_forest':
+                        model = RandomForestRegressor(**config)
+                    elif model_name == 'gradient_boosting':
+                        model = GradientBoostingRegressor(**config)
+                    elif model_name == 'xgboost' and XGBOOST_AVAILABLE:
+                        model = xgb.XGBRegressor(**config)
+                    else:
+                        continue
+
+                    # Train model
+                    model.fit(X_train, y_train)
+
+                    # Evaluate
+                    train_score = model.score(X_train, y_train)
+                    test_score = model.score(X_test, y_test) if len(X_test) > 0 else train_score
+
+                    models[model_name] = model
+                    performance[model_name] = {
+                        'train_r2': train_score,
+                        'test_r2': test_score,
+                        'data_points': len(X)
+                    }
+
+                    logger.info(f"   ✅ {model_name}: Train R² = {train_score:.3f}, Test R² = {test_score:.3f}")
+
+                except Exception as e:
+                    logger.error(f"   ❌ {model_name} training failed: {e}")
+
+            if not models:
+                raise ValueError("No models trained successfully")
+
+            # Store everything
             self.models[ticker] = {
-                'traditional': traditional_models,
-                'lstm': lstm_model,
+                'models': models,
                 'scaler': scaler,
-                'feature_columns': [col for col in df.columns if not col.startswith('target_')]
+                'feature_columns': feature_cols
             }
 
             self.model_performance[ticker] = {
-                'traditional': traditional_performance,
-                'lstm': lstm_performance,
+                'performance': performance,
                 'training_date': datetime.now().isoformat(),
                 'data_points': len(df)
             }
 
-            logger.info(f"Model training complete for {ticker}")
+            logger.info(f"✅ Training complete for {ticker}: {len(models)} models trained")
 
             return {
                 'success': True,
-                'models_trained': len(traditional_models) + (1 if lstm_model else 0),
-                'performance': self.model_performance[ticker]
+                'models_trained': len(models),
+                'performance': performance,
+                'data_points': len(df)
             }
 
         except Exception as e:
-            logger.error(f"Error training models for {ticker}: {e}")
+            logger.error(f"❌ Training failed for {ticker}: {e}")
             return {'success': False, 'error': str(e)}
 
-    def predict_price_movement(self, ticker: str, current_data: pd.DataFrame,
-                               sentiment_data: List[Dict] = None,
-                               market_data: Dict = None) -> Dict:
+    def predict_price_movement(self, ticker: str, current_data: pd.DataFrame = None,
+                             sentiment_data: List[Dict] = None) -> Dict:
         """Predict price movement for a ticker"""
 
         try:
+            # Check if models exist
             if ticker not in self.models:
-                raise ValueError(f"No trained models found for {ticker}")
+                # Try to train models first
+                logger.info(f"No models found for {ticker}, training...")
+                train_result = self.train_models(ticker, sentiment_data)
+                if not train_result['success']:
+                    raise ValueError(f"No models available and training failed: {train_result.get('error')}")
 
-            # Feature engineering on current data
-            df = self.feature_engineer.engineer_features(current_data, sentiment_data, market_data)
+            # Get recent data if not provided
+            if current_data is None or current_data.empty:
+                current_data = self.get_historical_data(ticker, days=50)
+                if current_data.empty:
+                    raise ValueError("No current data available for prediction")
 
-            # Get the latest features
+            # Calculate indicators
+            df = self.calculate_technical_indicators(current_data)
+
+            # Get latest features
             feature_cols = self.models[ticker]['feature_columns']
-            latest_features = df[feature_cols].iloc[-1:].values
+
+            # Check if we have the required features
+            missing_cols = [col for col in feature_cols if col not in df.columns]
+            if missing_cols:
+                raise ValueError(f"Missing feature columns: {missing_cols}")
+
+            # Get the latest row with all features
+            latest_data = df[feature_cols].dropna().tail(1)
+            if latest_data.empty:
+                raise ValueError("No valid feature data for prediction")
+
+            latest_features = latest_data.values
 
             # Scale features
             scaler = self.models[ticker]['scaler']
             latest_scaled = scaler.transform(latest_features)
 
-            # Predictions from traditional models
+            # Make predictions with all models
+            models = self.models[ticker]['models']
             predictions = {}
-            traditional_models = self.models[ticker]['traditional']
 
-            for model_name, model in traditional_models.items():
-                pred = model.predict(latest_scaled)[0]
-                predictions[model_name] = pred
+            for model_name, model in models.items():
+                try:
+                    pred = model.predict(latest_scaled)[0]
+                    predictions[model_name] = float(pred)
+                except Exception as e:
+                    logger.warning(f"Prediction failed for {model_name}: {e}")
 
-            # LSTM prediction
-            if self.models[ticker]['lstm'] and TORCH_AVAILABLE:
-                lstm_model = self.models[ticker]['lstm']
-                sequence_length = 10
+            if not predictions:
+                raise ValueError("All model predictions failed")
 
-                if len(df) >= sequence_length:
-                    # Create sequence for LSTM
-                    sequence_data = df[feature_cols].tail(sequence_length).values
-                    sequence_scaled = scaler.transform(sequence_data)
-                    sequence_tensor = torch.FloatTensor(sequence_scaled).unsqueeze(0)
+            # Ensemble prediction (simple average)
+            ensemble_pred = np.mean(list(predictions.values()))
 
-                    lstm_model.eval()
-                    with torch.no_grad():
-                        lstm_pred = lstm_model(sequence_tensor).item()
-                        predictions['lstm'] = lstm_pred
+            # Current price
+            current_price = float(current_data['close'].iloc[-1])
 
-            # Ensemble prediction (weighted average)
-            if predictions:
-                weights = {
-                    'random_forest': 0.25,
-                    'xgboost': 0.30,
-                    'gradient_boosting': 0.25,
-                    'lstm': 0.20
-                }
+            # Predicted price
+            predicted_price = current_price * (1 + ensemble_pred)
 
-                ensemble_pred = 0
-                total_weight = 0
+            # Calculate confidence based on model agreement
+            pred_values = list(predictions.values())
+            pred_std = np.std(pred_values)
+            confidence = max(0.3, min(0.9, 1 - (pred_std * 5)))
 
-                for model_name, pred in predictions.items():
-                    weight = weights.get(model_name, 0.1)
-                    ensemble_pred += pred * weight
-                    total_weight += weight
+            result = {
+                'ticker': ticker,
+                'current_price': current_price,
+                'predicted_return': float(ensemble_pred),
+                'predicted_price': float(predicted_price),
+                'price_change': float(predicted_price - current_price),
+                'price_change_pct': float((predicted_price - current_price) / current_price * 100),
+                'confidence': float(confidence),
+                'individual_predictions': predictions,
+                'prediction_date': datetime.now().isoformat(),
+                'direction': 'up' if ensemble_pred > 0 else 'down',
+                'magnitude': 'high' if abs(ensemble_pred) > 0.02 else 'moderate' if abs(ensemble_pred) > 0.01 else 'low',
+                'models_used': list(predictions.keys())
+            }
 
-                ensemble_pred = ensemble_pred / total_weight if total_weight > 0 else 0
+            logger.info(f"✅ Prediction for {ticker}: {ensemble_pred*100:.2f}% ({result['direction']})")
 
-                # Convert return to price prediction
-                current_price = current_data['close'].iloc[-1]
-                predicted_price = current_price * (1 + ensemble_pred)
-
-                # Calculate confidence based on model agreement
-                pred_values = list(predictions.values())
-                confidence = 1 - (np.std(pred_values) / (np.mean(np.abs(pred_values)) + 1e-8))
-                confidence = max(0, min(1, confidence))
-
-                return {
-                    'ticker': ticker,
-                    'current_price': current_price,
-                    'predicted_return': ensemble_pred,
-                    'predicted_price': predicted_price,
-                    'price_change': predicted_price - current_price,
-                    'price_change_pct': (predicted_price - current_price) / current_price * 100,
-                    'confidence': confidence,
-                    'individual_predictions': predictions,
-                    'prediction_date': datetime.now().isoformat(),
-                    'direction': 'up' if ensemble_pred > 0 else 'down',
-                    'magnitude': 'high' if abs(ensemble_pred) > 0.02 else 'moderate' if abs(
-                        ensemble_pred) > 0.01 else 'low'
-                }
-            else:
-                raise ValueError("No valid predictions generated")
+            return result
 
         except Exception as e:
-            logger.error(f"Error predicting for {ticker}: {e}")
+            logger.error(f"❌ Prediction failed for {ticker}: {e}")
             return {
                 'ticker': ticker,
                 'error': str(e),
                 'prediction_date': datetime.now().isoformat()
             }
 
-    def get_model_performance(self, ticker: str) -> Dict:
-        """Get performance metrics for trained models"""
+    def test_functionality(self, ticker: str = 'AAPL') -> Dict:
+        """Test the forecaster functionality"""
 
-        if ticker in self.model_performance:
-            return self.model_performance[ticker]
-        else:
-            return {'error': f'No performance data available for {ticker}'}
+        logger.info(f"🧪 Testing ML forecaster with {ticker}")
 
-    def save_models(self, filepath: str):
-        """Save trained models to disk"""
+        results = {
+            'ticker': ticker,
+            'yfinance_available': YFINANCE_AVAILABLE,
+            'tests': {}
+        }
 
+        # Test 1: Data retrieval
         try:
-            with open(filepath, 'wb') as f:
-                pickle.dump({
-                    'models': self.models,
-                    'performance': self.model_performance,
-                    'feature_engineer': self.feature_engineer
-                }, f)
-            logger.info(f"Models saved to {filepath}")
+            df = self.get_historical_data(ticker, days=50)
+            results['tests']['data_retrieval'] = {
+                'success': not df.empty,
+                'data_points': len(df),
+                'latest_price': float(df['close'].iloc[-1]) if not df.empty else None
+            }
         except Exception as e:
-            logger.error(f"Error saving models: {e}")
+            results['tests']['data_retrieval'] = {'success': False, 'error': str(e)}
 
-    def load_models(self, filepath: str):
-        """Load trained models from disk"""
+        # Test 2: Model training (only if data retrieval worked)
+        if results['tests']['data_retrieval']['success']:
+            try:
+                train_result = self.train_models(ticker)
+                results['tests']['model_training'] = {
+                    'success': train_result['success'],
+                    'models_trained': train_result.get('models_trained', 0),
+                    'error': train_result.get('error')
+                }
+            except Exception as e:
+                results['tests']['model_training'] = {'success': False, 'error': str(e)}
 
-        try:
-            with open(filepath, 'rb') as f:
-                data = pickle.load(f)
-                self.models = data['models']
-                self.model_performance = data['performance']
-                self.feature_engineer = data['feature_engineer']
-            logger.info(f"Models loaded from {filepath}")
-        except Exception as e:
-            logger.error(f"Error loading models: {e}")
+            # Test 3: Prediction (only if training worked)
+            if results['tests']['model_training']['success']:
+                try:
+                    prediction = self.predict_price_movement(ticker)
+                    results['tests']['prediction'] = {
+                        'success': 'error' not in prediction,
+                        'predicted_change': prediction.get('price_change_pct'),
+                        'confidence': prediction.get('confidence'),
+                        'error': prediction.get('error')
+                    }
+                except Exception as e:
+                    results['tests']['prediction'] = {'success': False, 'error': str(e)}
+
+        return results
 
 
 def main():
-    """Test the ML price forecaster"""
+    """Test the fixed forecaster"""
+
+    print("🚀 Testing Fixed ML Price Forecaster with yfinance")
+    print("=" * 60)
 
     forecaster = MLPriceForecaster()
 
-    # Test with a sample ticker
-    ticker = 'AAPL'
+    # Run comprehensive test
+    test_results = forecaster.test_functionality('AAPL')
 
-    print(f"🤖 Testing ML Price Forecaster with {ticker}")
+    print(f"\n📊 Test Results for {test_results['ticker']}:")
+    print(f"yfinance available: {test_results['yfinance_available']}")
 
-    # Train models
-    print("Training models...")
-    result = forecaster.train_models(ticker)
+    for test_name, result in test_results['tests'].items():
+        status = "✅" if result['success'] else "❌"
+        print(f"\n{status} {test_name.replace('_', ' ').title()}:")
 
-    if result['success']:
-        print(f"✅ Successfully trained {result['models_trained']} models")
-
-        # Get current data for prediction
-        current_data = forecaster.get_historical_data(ticker, days=50)
-
-        if not current_data.empty:
-            # Make prediction
-            print("Making prediction...")
-            prediction = forecaster.predict_price_movement(ticker, current_data)
-
-            if 'error' not in prediction:
-                print(f"\n📊 Prediction Results for {ticker}:")
-                print(f"Current Price: ${prediction['current_price']:.2f}")
-                print(f"Predicted Price: ${prediction['predicted_price']:.2f}")
-                print(f"Expected Change: {prediction['price_change_pct']:.2f}%")
-                print(f"Direction: {prediction['direction']}")
-                print(f"Magnitude: {prediction['magnitude']}")
-                print(f"Confidence: {prediction['confidence']:.2f}")
-            else:
-                print(f"❌ Prediction failed: {prediction['error']}")
+        if result['success']:
+            for key, value in result.items():
+                if key != 'success' and value is not None:
+                    print(f"   {key}: {value}")
         else:
-            print("❌ Could not get current data for prediction")
+            print(f"   Error: {result.get('error', 'Unknown error')}")
+
+    print("\n" + "=" * 60)
+
+    if all(test['success'] for test in test_results['tests'].values()):
+        print("🎉 ALL TESTS PASSED! ML Forecaster is working with yfinance")
     else:
-        print(f"❌ Model training failed: {result['error']}")
+        print("⚠️  Some tests failed. Check the errors above.")
 
 
 if __name__ == "__main__":

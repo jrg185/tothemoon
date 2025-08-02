@@ -125,7 +125,7 @@ class EnhancedContinuousRedditScraper:
             all_posts_data.extend(new_posts)
             logger.info(f"🆕 New posts: {len(new_posts)}")
 
-            rising_posts = self.scraper.scrape_posts(sort_type='rising', limit=10)
+            rising_posts = self.scraper.scrape_posts(sort_type='rising', limit=15)
             all_posts_data.extend(rising_posts)
             logger.info(f"📊 Rising posts: {len(rising_posts)}")
 
@@ -386,9 +386,9 @@ class EnhancedContinuousRedditScraper:
             'total_analyses_run': self.total_analyses_run,
             'processed_posts_cache_size': len(self.processed_posts),
             'processed_comments_cache_size': len(self.processed_comments),
-            'min_cycle_interval_minutes': self.min_cycle_interval / 60,
-            'minutes_since_last_scrape': (time.time() - self.last_scrape_time) / 60,
-            'minutes_since_last_analysis': (time.time() - self.last_analysis_time) / 60 if self.last_analysis_time > 0 else None,
+            'min_cycle_interval_minutes': self.min_cycle_interval / 15,
+            'minutes_since_last_scrape': (time.time() - self.last_scrape_time) / 15,
+            'minutes_since_last_analysis': (time.time() - self.last_analysis_time) / 15 if self.last_analysis_time > 0 else None,
             'all_tickers_found': sorted(list(self.total_tickers_found)),
             'firebase_quota_status': self.firebase_manager.get_quota_status(),
             'automated_analysis_available': self.analysis_engine is not None,
