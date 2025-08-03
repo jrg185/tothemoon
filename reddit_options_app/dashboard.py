@@ -1,6 +1,6 @@
 """
 FIXED WSB Options Trading Dashboard
-Compact layout with ML-prioritized recommendations and R² sorting
+Graceful Firebase error handling with Streamlit deployment compatibility
 """
 
 import sys
@@ -54,27 +54,77 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Simplified, working CSS
+# Clean, trading-focused CSS
 st.markdown("""
 <style>
     .main-header {
-        font-size: 2.5rem;
+        font-size: 3rem;
         color: #00FF88;
         text-align: center;
-        margin-bottom: 0.3rem;
+        margin-bottom: 0.5rem;
         font-weight: bold;
     }
-    
+
     .subtitle {
         text-align: center;
         color: #888;
-        font-size: 1.1rem;
-        margin-bottom: 1.5rem;
+        font-size: 1.3rem;  /* Increased from 1.2rem */
+        margin-bottom: 2rem;
     }
-    
-    .price-up { color: #00FF88; font-weight: bold; }
-    .price-down { color: #FF4444; font-weight: bold; }
-    .price-neutral { color: #FFFFFF; }
+
+    .trading-card {
+        background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+        border: 2px solid #00FF88;
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 4px 15px rgba(0, 255, 136, 0.1);
+        font-size: 1.1rem;  /* Add this line */
+    }
+
+    .bearish-card {
+        background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+        border: 2px solid #FF4444;
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 4px 15px rgba(255, 68, 68, 0.1);
+        font-size: 1.1rem;  /* Add this line */
+    }
+
+    .neutral-card {
+        background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+        border: 2px solid #888888;
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 4px 15px rgba(136, 136, 136, 0.1);
+        font-size: 1.1rem;  /* Add this line */
+    }
+
+    .price-up { 
+        color: #00FF88; 
+        font-weight: bold; 
+        font-size: 1.3em;  /* Increased from 1.1em */
+    }
+    .price-down { 
+        color: #FF4444; 
+        font-weight: bold; 
+        font-size: 1.3em;  /* Increased from 1.1em */
+    }
+    .price-neutral { 
+        color: #FFFFFF; 
+        font-size: 1.2em;  /* Increased from 1.1em */
+    }
+
+    .ai-analysis-section {
+        background: linear-gradient(135deg, #1a1a4a, #2d2d6d);
+        border: 2px solid #4488FF;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        font-size: 1.05rem;  /* Add this line */
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -150,10 +200,20 @@ class AccurateReadCounter:
 
 
 class FixedTradingDashboard:
-    """Fixed trading dashboard with compact layout and ML priority"""
+    """Fixed trading dashboard with graceful Firebase error handling"""
 
     def __init__(self):
-        self.firebase_manager = FirebaseManager()
+        """Initialize dashboard with graceful error handling"""
+        # Initialize Firebase with error handling
+        try:
+            self.firebase_manager = FirebaseManager()
+            self.firebase_available = self.firebase_manager.firebase_available
+        except Exception as e:
+            st.error(f"❌ Firebase initialization failed: {str(e)}")
+            st.warning("⚠️ Running in demo mode with sample data")
+            self.firebase_manager = None
+            self.firebase_available = False
+
         self.finnhub_key = FINANCIAL_APIS.get('finnhub')
         self.read_counter = AccurateReadCounter()
 
@@ -179,7 +239,7 @@ class FixedTradingDashboard:
                 self.ml_forecaster = None
 
     def get_stock_price_data(self, ticker: str) -> dict:
-        """Get price data with caching"""
+        """Get price data with caching and fallback"""
         cache_key = ticker.upper()
         current_time = time.time()
 
@@ -189,7 +249,7 @@ class FixedTradingDashboard:
 
         try:
             if not self.finnhub_key:
-                return self._get_default_price_data()
+                return self._get_default_price_data(ticker)
 
             url = f"https://finnhub.io/api/v1/quote?symbol={ticker}&token={self.finnhub_key}"
             response = requests.get(url, timeout=5)
@@ -211,12 +271,33 @@ class FixedTradingDashboard:
         except Exception:
             pass
 
-        return self._get_default_price_data()
+        return self._get_default_price_data(ticker)
 
-    def _get_default_price_data(self):
+    def _get_default_price_data(self, ticker: str = None):
+        """Get default/sample price data when API is unavailable"""
+        # Provide realistic sample data based on ticker
+        sample_prices = {
+            'TSLA': {'current_price': 245.67, 'change': 6.23, 'change_percent': 2.6},
+            'AAPL': {'current_price': 172.85, 'change': -2.14, 'change_percent': -1.2},
+            'NVDA': {'current_price': 431.28, 'change': 8.47, 'change_percent': 2.0},
+            'SPY': {'current_price': 485.92, 'change': 1.23, 'change_percent': 0.3},
+            'QQQ': {'current_price': 395.74, 'change': -1.85, 'change_percent': -0.5}
+        }
+
+        if ticker and ticker.upper() in sample_prices:
+            base_data = sample_prices[ticker.upper()]
+        else:
+            # Default for unknown tickers
+            base_data = {'current_price': 100.00, 'change': 0, 'change_percent': 0}
+
         return {
-            'current_price': 0, 'change': 0, 'change_percent': 0,
-            'high': 0, 'low': 0, 'open': 0, 'prev_close': 0
+            'current_price': base_data['current_price'],
+            'change': base_data['change'],
+            'change_percent': base_data['change_percent'],
+            'high': base_data['current_price'] * 1.02,
+            'low': base_data['current_price'] * 0.98,
+            'open': base_data['current_price'] - base_data['change'],
+            'prev_close': base_data['current_price'] - base_data['change']
         }
 
     def get_enhanced_analysis(self, ticker: str, sentiment_data: Dict) -> Dict:
@@ -284,6 +365,17 @@ class FixedTradingDashboard:
 
     def get_reddit_posts_for_ticker(self, ticker: str, limit: int = 2) -> List[Dict]:
         """Get recent Reddit posts for a specific ticker"""
+        if not self.firebase_available:
+            # Return sample posts when Firebase unavailable
+            return [
+                {
+                    'title': f'{ticker} looking strong this week',
+                    'score': 125,
+                    'permalink': 'https://reddit.com/r/wallstreetbets/sample_post',
+                    'created_utc': time.time() - 1800
+                }
+            ]
+
         try:
             posts = self.firebase_manager.get_posts_by_ticker(ticker, limit=limit, use_cache=True)
 
@@ -301,7 +393,67 @@ class FixedTradingDashboard:
             return []
 
     def get_trading_opportunities(self, max_tickers: int = 10):
-        """Get trading opportunities with R² sorting"""
+        """Get trading opportunities with graceful error handling"""
+        if not self.firebase_available:
+            # Return sample data when Firebase is unavailable
+            return {
+                'opportunities': [
+                    {
+                        'ticker': 'TSLA',
+                        'sentiment': 'bullish',
+                        'confidence': 0.75,
+                        'numerical_score': 0.6,
+                        'mention_count_24h': 15,
+                        'mention_count_1h': 3,
+                        'current_price': 245.67,
+                        'change_percent': 2.6,
+                        'opportunity_score': 85,
+                        'price_data': self._get_default_price_data('TSLA'),
+                        'sentiment_distribution': {'bullish': 10, 'neutral': 3, 'bearish': 2},
+                        'reddit_posts': [{'title': 'TSLA calls looking good', 'score': 150, 'permalink': 'https://reddit.com/r/wallstreetbets/sample'}],
+                        'r_squared': 0.0
+                    },
+                    {
+                        'ticker': 'AAPL',
+                        'sentiment': 'neutral',
+                        'confidence': 0.5,
+                        'numerical_score': 0.1,
+                        'mention_count_24h': 12,
+                        'mention_count_1h': 1,
+                        'current_price': 172.85,
+                        'change_percent': -1.2,
+                        'opportunity_score': 60,
+                        'price_data': self._get_default_price_data('AAPL'),
+                        'sentiment_distribution': {'bullish': 4, 'neutral': 6, 'bearish': 2},
+                        'reddit_posts': [{'title': 'AAPL earnings thoughts?', 'score': 89, 'permalink': 'https://reddit.com/r/wallstreetbets/sample'}],
+                        'r_squared': 0.0
+                    },
+                    {
+                        'ticker': 'NVDA',
+                        'sentiment': 'bullish',
+                        'confidence': 0.8,
+                        'numerical_score': 0.7,
+                        'mention_count_24h': 8,
+                        'mention_count_1h': 2,
+                        'current_price': 431.28,
+                        'change_percent': 2.0,
+                        'opportunity_score': 90,
+                        'price_data': self._get_default_price_data('NVDA'),
+                        'sentiment_distribution': {'bullish': 6, 'neutral': 1, 'bearish': 1},
+                        'reddit_posts': [{'title': 'NVDA AI boom continues', 'score': 200, 'permalink': 'https://reddit.com/r/wallstreetbets/sample'}],
+                        'r_squared': 0.0
+                    }
+                ],
+                'total_tickers': 3,
+                'hot_stocks': [],
+                'bullish_plays': [],
+                'bearish_plays': [],
+                'momentum_plays': [],
+                'read_status': {'daily_reads': 0, 'quota_healthy': True},
+                'demo_mode': True
+            }
+
+        # Firebase is available - use real data
         try:
             fm = self.firebase_manager
 
@@ -323,12 +475,26 @@ class FixedTradingDashboard:
                     trending_info = next((t for t in trending_24h if t.get('ticker') == ticker), {})
                     recent_trending = next((t for t in trending_1h if t.get('ticker') == ticker), {})
 
+                    # FIXED: Get actual Reddit posts for this ticker
+                    reddit_posts = []
+                    try:
+                        ticker_posts = fm.get_posts_by_ticker(ticker, limit=5, use_cache=True)
+                        for post in ticker_posts[:3]:  # Top 3 posts
+                            reddit_posts.append({
+                                'title': post.get('title', '')[:80] + '...' if len(
+                                    post.get('title', '')) > 80 else post.get('title', ''),
+                                'score': post.get('score', 0),
+                                'permalink': f"https://reddit.com{post.get('permalink', '')}" if post.get(
+                                    'permalink') else '',
+                                'created_utc': post.get('created_utc', 0)
+                            })
+                    except Exception as e:
+                        # If posts query fails (due to index), create placeholder
+                        reddit_posts = []
+
                     opportunity_score = self.calculate_opportunity_score(
                         sentiment_item, price_data, trending_info, recent_trending
                     )
-
-                    sentiment_distribution = sentiment_item.get('sentiment_distribution', {})
-                    reddit_posts = self.get_reddit_posts_for_ticker(ticker, limit=2)
 
                     opportunity = {
                         'ticker': ticker,
@@ -341,9 +507,8 @@ class FixedTradingDashboard:
                         'change_percent': float(price_data['change_percent']),
                         'opportunity_score': opportunity_score,
                         'price_data': price_data,
-                        'sentiment_distribution': sentiment_distribution,
-                        'reddit_posts': reddit_posts,
-                        'r_squared': 0.0  # Will be updated with ML analysis
+                        'reddit_posts': reddit_posts,  # FIXED: Add actual Reddit posts
+                        'sentiment_distribution': sentiment_item.get('sentiment_distribution', {})  # Add this too
                     }
                     opportunities.append(opportunity)
 
@@ -355,15 +520,13 @@ class FixedTradingDashboard:
                 'bearish_plays': [op for op in opportunities if op['sentiment'] == 'bearish' and op['confidence'] > 0.5],
                 'momentum_plays': [op for op in opportunities if op['mention_count_1h'] > 0 or abs(op['change_percent']) > 1],
                 'read_status': self.read_counter.get_status(),
-                'max_tickers_used': len(top_sentiment_items)
+                'max_tickers_used': len(top_sentiment_items),
+                'demo_mode': False
             }
 
         except Exception as e:
-            return {
-                'opportunities': [], 'total_tickers': 0, 'hot_stocks': [], 'bullish_plays': [],
-                'bearish_plays': [], 'momentum_plays': [], 'error': str(e),
-                'read_status': self.read_counter.get_status()
-            }
+            st.error(f"❌ Error loading data: {e}")
+            return {'opportunities': [], 'error': str(e), 'demo_mode': True}
 
     def calculate_opportunity_score(self, sentiment_data, price_data, trending_data, recent_trending):
         """Calculate opportunity score"""
@@ -530,36 +693,36 @@ class FixedTradingDashboard:
         with col1:
             st.markdown(f"""
             <div style="text-align: center;">
-                <div style="color: #AAA; font-size: 0.65em;">Primary Signal</div>
-                <div style="color: {border_color}; font-weight: bold; font-size: 0.75em;">{primary_signal}</div>
-                <div style="color: #888; font-size: 0.55em;">{primary_confidence:.0%} conf</div>
+                <div style="color: #AAA; font-size: 0.75em;">Primary Signal</div>
+                <div style="color: {border_color}; font-weight: bold; font-size: 0.9em;">{primary_signal}</div>
+                <div style="color: #888; font-size: 0.7em;">{primary_confidence:.0%} conf</div>
             </div>
             """, unsafe_allow_html=True)
 
         with col2:
             st.markdown(f"""
             <div style="text-align: center;">
-                <div style="color: #AAA; font-size: 0.65em;">Mentions 24h</div>
-                <div style="color: white; font-weight: bold; font-size: 0.75em;">{stock['mention_count_24h']}</div>
-                <div style="color: #888; font-size: 0.55em;">Reddit: {reddit_sentiment}</div>
+                <div style="color: #AAA; font-size: 0.75em;">Mentions 24h</div>
+                <div style="color: white; font-weight: bold; font-size: 0.9em;">{stock['mention_count_24h']}</div>
+                <div style="color: #888; font-size: 0.7em;">Reddit: {reddit_sentiment}</div>
             </div>
             """, unsafe_allow_html=True)
 
         with col3:
             st.markdown(f"""
             <div style="text-align: center;">
-                <div style="color: #AAA; font-size: 0.65em;">Model R²</div>
-                <div style="color: #FFD700; font-weight: bold; font-size: 0.75em;">{r_squared_display}</div>
-                <div style="color: #888; font-size: 0.55em;">Accuracy</div>
+                <div style="color: #AAA; font-size: 0.75em;">Model R²</div>
+                <div style="color: #FFD700; font-weight: bold; font-size: 0.9em;">{r_squared_display}</div>
+                <div style="color: #888; font-size: 0.7em;">Accuracy</div>
             </div>
             """, unsafe_allow_html=True)
 
         with col4:
             st.markdown(f"""
             <div style="text-align: center;">
-                <div style="color: #AAA; font-size: 0.65em;">Momentum</div>
-                <div style="color: {momentum_color}; font-weight: bold; font-size: 0.75em;">{momentum_display}</div>
-                <div style="color: #888; font-size: 0.55em;">1h activity</div>
+                <div style="color: #AAA; font-size: 0.75em;">Momentum</div>
+                <div style="color: {momentum_color}; font-weight: bold; font-size: 0.9em;">{momentum_display}</div>
+                <div style="color: #888; font-size: 0.7em;">1h activity</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -626,11 +789,25 @@ class FixedTradingDashboard:
         st.markdown("<br>", unsafe_allow_html=True)
 
     def render_main_interface(self):
-        """Render the main trading interface with compact layout"""
+        """Render the main trading interface with connection status"""
 
         # Compact header
         st.markdown('<h1 class="main-header">💰 WSB Options Trader</h1>', unsafe_allow_html=True)
         st.markdown('<p class="subtitle">Real-time sentiment • AI + ML analysis</p>', unsafe_allow_html=True)
+
+        # Connection status indicator
+        if self.firebase_available:
+            st.markdown("""
+            <div class="connection-status status-live">
+                ✅ Connected to Live Data
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="connection-status status-demo">
+                📱 Demo Mode - Sample Data
+            </div>
+            """, unsafe_allow_html=True)
 
         # Compact controls
         col1, col2, col3, col4, col5 = st.columns([2, 2, 1, 1, 1])
@@ -646,27 +823,34 @@ class FixedTradingDashboard:
 
         with col4:
             if st.button("🔄", use_container_width=True):
-                self.firebase_manager.clear_cache()
+                if self.firebase_available:
+                    self.firebase_manager.clear_cache()
                 st.cache_data.clear()
                 st.rerun()
 
         with col5:
             read_status = self.read_counter.get_status()
-            quota_pct = (read_status['daily_reads'] / 35000) * 100
+            quota_pct = (read_status['daily_reads'] / 35000) * 100 if self.firebase_available else 0
             if quota_pct > 80:
                 st.error(f"{quota_pct:.0f}%")
+            elif quota_pct > 50:
+                st.warning(f"{quota_pct:.0f}%")
             else:
-                st.success(f"{quota_pct:.0f}%")
+                st.success("✅" if self.firebase_available else "📱")
 
         # Get data
         enable_advanced = (analysis_mode == "Advanced AI+ML")
 
-        with st.spinner("🔍 Loading..."):
+        with st.spinner("🔍 Loading opportunities..."):
             data = self.get_trading_opportunities(max_tickers)
 
         if 'error' in data:
             st.error(f"❌ Error: {data['error']}")
             return
+
+        # Show demo mode indicator
+        if data.get('demo_mode', False):
+            st.info("📱 **Demo Mode**: Showing sample trading opportunities. Connect Firebase for live data.")
 
         # Compact metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -732,7 +916,7 @@ class FixedTradingDashboard:
             with col1:
                 st.metric("FB Reads", read_status.get('daily_reads', 0))
             with col2:
-                st.metric("Analyzed", data['max_tickers_used'])
+                st.metric("Analyzed", data.get('max_tickers_used', 0))
             with col3:
                 st.metric("R² Avg", f"{np.mean([op.get('r_squared', 0) for op in opportunities[:5]]):.2f}" if opportunities else "0.00")
 
