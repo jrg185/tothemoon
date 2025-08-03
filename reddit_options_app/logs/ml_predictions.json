@@ -962,5 +962,1510 @@
     "created_at": "2025-08-02T18:58:03.109743+00:00",
     "model_version": "v2.0",
     "status": "pending"
+  },
+  "USAR_1754228170": {
+    "prediction_id": "USAR_1754228170",
+    "ticker": "USAR",
+    "prediction_time": "2025-08-03T09:36:10.690507",
+    "current_price": 13.9399995803833,
+    "overall_direction": "down",
+    "overall_confidence": 0.22628696322532094,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.24469902510690514,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.24963445492833278,
+          "random_forest": 0.2397635952854775
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.20787490134373676,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.25806046351464634,
+          "random_forest": 0.15768933917282715
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.183,
+      "numerical_score": 0.123
+    },
+    "created_at": "2025-08-03T13:36:10.690554+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "SPY_1754228178": {
+    "prediction_id": "SPY_1754228178",
+    "ticker": "SPY",
+    "prediction_time": "2025-08-03T09:36:18.240609",
+    "current_price": 621.719970703125,
+    "overall_direction": "down",
+    "overall_confidence": 0.20241223658071203,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.2864164027308649,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3819900174032676,
+          "random_forest": 0.19084278805846216
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.11840807043055918,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.11950851843418199,
+          "random_forest": 0.11730762242693638
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.249,
+      "numerical_score": 0.159
+    },
+    "created_at": "2025-08-03T13:36:18.240632+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "NVDA_1754228184": {
+    "prediction_id": "NVDA_1754228184",
+    "ticker": "NVDA",
+    "prediction_time": "2025-08-03T09:36:24.328675",
+    "current_price": 173.72000122070312,
+    "overall_direction": "down",
+    "overall_confidence": 0.3828325596150691,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.42068076438453483,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.37916819829769893,
+          "random_forest": 0.4621933304713707
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.3449843548456034,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.2940250420564039,
+          "random_forest": 0.39594366763480293
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.18,
+      "numerical_score": 0.674
+    },
+    "created_at": "2025-08-03T13:36:24.328691+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "META_1754228189": {
+    "prediction_id": "META_1754228189",
+    "ticker": "META",
+    "prediction_time": "2025-08-03T09:36:29.689238",
+    "current_price": 750.010009765625,
+    "overall_direction": "down",
+    "overall_confidence": 0.2507633206001537,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.27782838246637886,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.36561372730082964,
+          "random_forest": 0.19004303763192815
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.22369825873392857,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.28170030053279405,
+          "random_forest": 0.16569621693506306
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.225,
+      "numerical_score": 0.066
+    },
+    "created_at": "2025-08-03T13:36:29.689268+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "MP_1754228195": {
+    "prediction_id": "MP_1754228195",
+    "ticker": "MP",
+    "prediction_time": "2025-08-03T09:36:35.673332",
+    "current_price": 63.689998626708984,
+    "overall_direction": "down",
+    "overall_confidence": 0.29608491357401395,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.3020395537718187,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.26669210577696245,
+          "random_forest": 0.33738700176667485
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2901302733762092,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.23775364121835063,
+          "random_forest": 0.34250690553406776
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.208,
+      "numerical_score": 0.039
+    },
+    "created_at": "2025-08-03T13:36:35.673351+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "USAR_1754228719": {
+    "prediction_id": "USAR_1754228719",
+    "ticker": "USAR",
+    "prediction_time": "2025-08-03T09:45:19.839794",
+    "current_price": 13.9399995803833,
+    "overall_direction": "down",
+    "overall_confidence": 0.22628696322532094,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.24469902510690514,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.24963445492833278,
+          "random_forest": 0.2397635952854775
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.20787490134373676,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.25806046351464634,
+          "random_forest": 0.15768933917282715
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.183,
+      "numerical_score": 0.123
+    },
+    "created_at": "2025-08-03T13:45:19.839845+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "SPY_1754228727": {
+    "prediction_id": "SPY_1754228727",
+    "ticker": "SPY",
+    "prediction_time": "2025-08-03T09:45:27.611667",
+    "current_price": 621.719970703125,
+    "overall_direction": "down",
+    "overall_confidence": 0.20241224081665143,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.2864164192223787,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3819900503862953,
+          "random_forest": 0.19084278805846216
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.11840806241092414,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.11950850239491191,
+          "random_forest": 0.11730762242693638
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.249,
+      "numerical_score": 0.159
+    },
+    "created_at": "2025-08-03T13:45:27.611687+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "NVDA_1754228737": {
+    "prediction_id": "NVDA_1754228737",
+    "ticker": "NVDA",
+    "prediction_time": "2025-08-03T09:45:37.375272",
+    "current_price": 173.72000122070312,
+    "overall_direction": "down",
+    "overall_confidence": 0.3828325585746639,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.42068076439806174,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3791681983247528,
+          "random_forest": 0.4621933304713707
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.34498435275126604,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.29402503786772916,
+          "random_forest": 0.39594366763480293
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.18,
+      "numerical_score": 0.674
+    },
+    "created_at": "2025-08-03T13:45:37.375299+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "META_1754228747": {
+    "prediction_id": "META_1754228747",
+    "ticker": "META",
+    "prediction_time": "2025-08-03T09:45:47.355846",
+    "current_price": 750.010009765625,
+    "overall_direction": "down",
+    "overall_confidence": 0.2507633330939737,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.2778283973852016,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3656137571384751,
+          "random_forest": 0.19004303763192815
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.22369826880274585,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.28170032067042866,
+          "random_forest": 0.16569621693506306
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.225,
+      "numerical_score": 0.066
+    },
+    "created_at": "2025-08-03T13:45:47.355870+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "MP_1754228753": {
+    "prediction_id": "MP_1754228753",
+    "ticker": "MP",
+    "prediction_time": "2025-08-03T09:45:53.988448",
+    "current_price": 63.689998626708984,
+    "overall_direction": "down",
+    "overall_confidence": 0.29608491357401395,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.3020395537718187,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.26669210577696245,
+          "random_forest": 0.33738700176667485
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2901302733762092,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.23775364121835063,
+          "random_forest": 0.34250690553406776
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.208,
+      "numerical_score": 0.039
+    },
+    "created_at": "2025-08-03T13:45:53.988477+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "USAR_1754229055": {
+    "prediction_id": "USAR_1754229055",
+    "ticker": "USAR",
+    "prediction_time": "2025-08-03T09:50:55.216795",
+    "current_price": 13.9399995803833,
+    "overall_direction": "down",
+    "overall_confidence": 0.22628696322532094,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.24469902510690514,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.24963445492833278,
+          "random_forest": 0.2397635952854775
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.20787490134373676,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.25806046351464634,
+          "random_forest": 0.15768933917282715
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.183,
+      "numerical_score": 0.123
+    },
+    "created_at": "2025-08-03T13:50:55.216846+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "SPY_1754229065": {
+    "prediction_id": "SPY_1754229065",
+    "ticker": "SPY",
+    "prediction_time": "2025-08-03T09:51:05.481586",
+    "current_price": 621.719970703125,
+    "overall_direction": "down",
+    "overall_confidence": 0.20241218295789368,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.28641640210860786,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3819900161587536,
+          "random_forest": 0.19084278805846216
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.11840796380717948,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.11950830518742259,
+          "random_forest": 0.11730762242693638
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.249,
+      "numerical_score": 0.159
+    },
+    "created_at": "2025-08-03T13:51:05.481617+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "NVDA_1754229076": {
+    "prediction_id": "NVDA_1754229076",
+    "ticker": "NVDA",
+    "prediction_time": "2025-08-03T09:51:16.483771",
+    "current_price": 173.72000122070312,
+    "overall_direction": "down",
+    "overall_confidence": 0.38283255649247305,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.4206807633737621,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3791681962761535,
+          "random_forest": 0.4621933304713707
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.34498434961118396,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.29402503158756493,
+          "random_forest": 0.39594366763480293
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.18,
+      "numerical_score": 0.674
+    },
+    "created_at": "2025-08-03T13:51:16.483813+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "META_1754229084": {
+    "prediction_id": "META_1754229084",
+    "ticker": "META",
+    "prediction_time": "2025-08-03T09:51:24.030729",
+    "current_price": 750.010009765625,
+    "overall_direction": "down",
+    "overall_confidence": 0.25076324564234953,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.27782827067378624,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3656135037156443,
+          "random_forest": 0.19004303763192815
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.22369822061091277,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.28170022428676245,
+          "random_forest": 0.16569621693506306
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.225,
+      "numerical_score": 0.066
+    },
+    "created_at": "2025-08-03T13:51:24.030767+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "MP_1754229094": {
+    "prediction_id": "MP_1754229094",
+    "ticker": "MP",
+    "prediction_time": "2025-08-03T09:51:34.482423",
+    "current_price": 63.689998626708984,
+    "overall_direction": "down",
+    "overall_confidence": 0.29608491357401395,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.3020395537718187,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.26669210577696245,
+          "random_forest": 0.33738700176667485
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2901302733762092,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.23775364121835063,
+          "random_forest": 0.34250690553406776
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.208,
+      "numerical_score": 0.039
+    },
+    "created_at": "2025-08-03T13:51:34.482456+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "META_1754229686": {
+    "prediction_id": "META_1754229686",
+    "ticker": "META",
+    "prediction_time": "2025-08-03T10:01:26.637260",
+    "current_price": 750.010009765625,
+    "overall_direction": "down",
+    "overall_confidence": 0.25076323831775815,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.27782824973874987,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.36561346184557164,
+          "random_forest": 0.19004303763192815
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.22369822689676638,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.2817002368584697,
+          "random_forest": 0.16569621693506306
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.225,
+      "numerical_score": 0.066
+    },
+    "created_at": "2025-08-03T14:01:26.637296+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "GOOGL_1754229691": {
+    "prediction_id": "GOOGL_1754229691",
+    "ticker": "GOOGL",
+    "prediction_time": "2025-08-03T10:01:31.599671",
+    "current_price": 189.1300048828125,
+    "overall_direction": "down",
+    "overall_confidence": 0.3516266781486348,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.4066595099756781,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.4303292575422708,
+          "random_forest": 0.38298976240908544
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.29659384632159147,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3157156770783983,
+          "random_forest": 0.2774720155647847
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.18,
+      "numerical_score": 0.0
+    },
+    "created_at": "2025-08-03T14:01:31.599686+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "RH_1754229699": {
+    "prediction_id": "RH_1754229699",
+    "ticker": "RH",
+    "prediction_time": "2025-08-03T10:01:39.098108",
+    "current_price": 200.75999450683594,
+    "overall_direction": "down",
+    "overall_confidence": 0.45421851389259826,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.46447440668931006,
+        "individual_predictions": {
+          "logistic_regression": 1,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.5064522533088965,
+          "random_forest": 0.4224965600697235
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.44396262109588647,
+        "individual_predictions": {
+          "logistic_regression": 1,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.5419120705460156,
+          "random_forest": 0.34601317164575723
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.077,
+      "numerical_score": -0.002
+    },
+    "created_at": "2025-08-03T14:01:39.098138+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "USAR_1754229704": {
+    "prediction_id": "USAR_1754229704",
+    "ticker": "USAR",
+    "prediction_time": "2025-08-03T10:01:44.829246",
+    "current_price": 13.9399995803833,
+    "overall_direction": "down",
+    "overall_confidence": 0.22628696322532094,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.24469902510690514,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.24963445492833278,
+          "random_forest": 0.2397635952854775
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.20787490134373676,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.25806046351464634,
+          "random_forest": 0.15768933917282715
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.183,
+      "numerical_score": 0.123
+    },
+    "created_at": "2025-08-03T14:01:44.829271+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "MP_1754229710": {
+    "prediction_id": "MP_1754229710",
+    "ticker": "MP",
+    "prediction_time": "2025-08-03T10:01:50.806293",
+    "current_price": 63.689998626708984,
+    "overall_direction": "down",
+    "overall_confidence": 0.29608491357401395,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.3020395537718187,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.26669210577696245,
+          "random_forest": 0.33738700176667485
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2901302733762092,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.23775364121835063,
+          "random_forest": 0.34250690553406776
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.208,
+      "numerical_score": 0.039
+    },
+    "created_at": "2025-08-03T14:01:50.806316+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "META_1754229759": {
+    "prediction_id": "META_1754229759",
+    "ticker": "META",
+    "prediction_time": "2025-08-03T10:02:39.638910",
+    "current_price": 750.010009765625,
+    "overall_direction": "down",
+    "overall_confidence": 0.250763287291246,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.2778283718693775,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.36561370610682675,
+          "random_forest": 0.19004303763192815
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.22369820271311447,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.2817001884911659,
+          "random_forest": 0.16569621693506306
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.225,
+      "numerical_score": 0.066
+    },
+    "created_at": "2025-08-03T14:02:39.638933+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "GOOGL_1754229769": {
+    "prediction_id": "GOOGL_1754229769",
+    "ticker": "GOOGL",
+    "prediction_time": "2025-08-03T10:02:49.031078",
+    "current_price": 189.1300048828125,
+    "overall_direction": "down",
+    "overall_confidence": 0.3516267093586276,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.40665956312767704,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.4303293638462687,
+          "random_forest": 0.38298976240908544
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2965938555895782,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.31571569561437174,
+          "random_forest": 0.2774720155647847
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.18,
+      "numerical_score": 0.0
+    },
+    "created_at": "2025-08-03T14:02:49.031107+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "RH_1754229780": {
+    "prediction_id": "RH_1754229780",
+    "ticker": "RH",
+    "prediction_time": "2025-08-03T10:03:00.318235",
+    "current_price": 200.75999450683594,
+    "overall_direction": "down",
+    "overall_confidence": 0.45421851389259826,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.46447440668931006,
+        "individual_predictions": {
+          "logistic_regression": 1,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.5064522533088965,
+          "random_forest": 0.4224965600697235
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.44396262109588647,
+        "individual_predictions": {
+          "logistic_regression": 1,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.5419120705460156,
+          "random_forest": 0.34601317164575723
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.077,
+      "numerical_score": -0.002
+    },
+    "created_at": "2025-08-03T14:03:00.318263+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "USAR_1754229786": {
+    "prediction_id": "USAR_1754229786",
+    "ticker": "USAR",
+    "prediction_time": "2025-08-03T10:03:06.916371",
+    "current_price": 13.9399995803833,
+    "overall_direction": "down",
+    "overall_confidence": 0.22628696322532094,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.24469902510690514,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.24963445492833278,
+          "random_forest": 0.2397635952854775
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.20787490134373676,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.25806046351464634,
+          "random_forest": 0.15768933917282715
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.183,
+      "numerical_score": 0.123
+    },
+    "created_at": "2025-08-03T14:03:06.916408+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "MP_1754229796": {
+    "prediction_id": "MP_1754229796",
+    "ticker": "MP",
+    "prediction_time": "2025-08-03T10:03:16.630386",
+    "current_price": 63.689998626708984,
+    "overall_direction": "down",
+    "overall_confidence": 0.29608491357401395,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.3020395537718187,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.26669210577696245,
+          "random_forest": 0.33738700176667485
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2901302733762092,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.23775364121835063,
+          "random_forest": 0.34250690553406776
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.208,
+      "numerical_score": 0.039
+    },
+    "created_at": "2025-08-03T14:03:16.630418+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "META_1754230000": {
+    "prediction_id": "META_1754230000",
+    "ticker": "META",
+    "prediction_time": "2025-08-03T10:06:40.594996",
+    "current_price": 750.010009765625,
+    "overall_direction": "down",
+    "overall_confidence": 0.25076329877772313,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.2778283748696613,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.3656137121073944,
+          "random_forest": 0.19004303763192815
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.223698222685785,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.2817002284365069,
+          "random_forest": 0.16569621693506306
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.225,
+      "numerical_score": 0.066
+    },
+    "created_at": "2025-08-03T14:06:40.595038+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "GOOGL_1754230008": {
+    "prediction_id": "GOOGL_1754230008",
+    "ticker": "GOOGL",
+    "prediction_time": "2025-08-03T10:06:48.347465",
+    "current_price": 189.1300048828125,
+    "overall_direction": "down",
+    "overall_confidence": 0.3516267236074638,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.4066595941366118,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.43032942586413814,
+          "random_forest": 0.38298976240908544
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.29659385307831576,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.31571569059184684,
+          "random_forest": 0.2774720155647847
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.18,
+      "numerical_score": 0.0
+    },
+    "created_at": "2025-08-03T14:06:48.347479+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "RH_1754230014": {
+    "prediction_id": "RH_1754230014",
+    "ticker": "RH",
+    "prediction_time": "2025-08-03T10:06:54.851292",
+    "current_price": 200.75999450683594,
+    "overall_direction": "down",
+    "overall_confidence": 0.45421851389259826,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.46447440668931006,
+        "individual_predictions": {
+          "logistic_regression": 1,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.5064522533088965,
+          "random_forest": 0.4224965600697235
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.44396262109588647,
+        "individual_predictions": {
+          "logistic_regression": 1,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.5419120705460156,
+          "random_forest": 0.34601317164575723
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.077,
+      "numerical_score": -0.002
+    },
+    "created_at": "2025-08-03T14:06:54.851308+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "USAR_1754230019": {
+    "prediction_id": "USAR_1754230019",
+    "ticker": "USAR",
+    "prediction_time": "2025-08-03T10:06:59.132855",
+    "current_price": 13.9399995803833,
+    "overall_direction": "down",
+    "overall_confidence": 0.22628696322532094,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.24469902510690514,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.24963445492833278,
+          "random_forest": 0.2397635952854775
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.20787490134373676,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.25806046351464634,
+          "random_forest": 0.15768933917282715
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.183,
+      "numerical_score": 0.123
+    },
+    "created_at": "2025-08-03T14:06:59.132876+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "MP_1754230023": {
+    "prediction_id": "MP_1754230023",
+    "ticker": "MP",
+    "prediction_time": "2025-08-03T10:07:03.383246",
+    "current_price": 63.689998626708984,
+    "overall_direction": "down",
+    "overall_confidence": 0.29608491357401395,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.3020395537718187,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.26669210577696245,
+          "random_forest": 0.33738700176667485
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2901302733762092,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.23775364121835063,
+          "random_forest": 0.34250690553406776
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.208,
+      "numerical_score": 0.039
+    },
+    "created_at": "2025-08-03T14:07:03.383270+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "META_1754230166": {
+    "prediction_id": "META_1754230166",
+    "ticker": "META",
+    "prediction_time": "2025-08-03T10:09:26.912300",
+    "current_price": 750.010009765625,
+    "overall_direction": "down",
+    "overall_confidence": 0.25076327220940176,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.2778283382148991,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.36561363879787007,
+          "random_forest": 0.19004303763192815
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2236982062039044,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.2817001954727458,
+          "random_forest": 0.16569621693506306
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.225,
+      "numerical_score": 0.066
+    },
+    "created_at": "2025-08-03T14:09:26.912338+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "GOOGL_1754230177": {
+    "prediction_id": "GOOGL_1754230177",
+    "ticker": "GOOGL",
+    "prediction_time": "2025-08-03T10:09:37.463348",
+    "current_price": 189.1300048828125,
+    "overall_direction": "down",
+    "overall_confidence": 0.35162673009391615,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.4066596195145067,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.4303294766199279,
+          "random_forest": 0.38298976240908544
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2965938406733256,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.31571566578186655,
+          "random_forest": 0.2774720155647847
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.18,
+      "numerical_score": 0.0
+    },
+    "created_at": "2025-08-03T14:09:37.463386+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "RH_1754230189": {
+    "prediction_id": "RH_1754230189",
+    "ticker": "RH",
+    "prediction_time": "2025-08-03T10:09:49.923177",
+    "current_price": 200.75999450683594,
+    "overall_direction": "down",
+    "overall_confidence": 0.45421851389259826,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.46447440668931006,
+        "individual_predictions": {
+          "logistic_regression": 1,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.5064522533088965,
+          "random_forest": 0.4224965600697235
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.44396262109588647,
+        "individual_predictions": {
+          "logistic_regression": 1,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.5419120705460156,
+          "random_forest": 0.34601317164575723
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.077,
+      "numerical_score": -0.002
+    },
+    "created_at": "2025-08-03T14:09:49.923200+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "USAR_1754230195": {
+    "prediction_id": "USAR_1754230195",
+    "ticker": "USAR",
+    "prediction_time": "2025-08-03T10:09:55.796363",
+    "current_price": 13.9399995803833,
+    "overall_direction": "down",
+    "overall_confidence": 0.22628696322532094,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.24469902510690514,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.24963445492833278,
+          "random_forest": 0.2397635952854775
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.20787490134373676,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.25806046351464634,
+          "random_forest": 0.15768933917282715
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "bullish",
+      "confidence": 0.183,
+      "numerical_score": 0.123
+    },
+    "created_at": "2025-08-03T14:09:55.796404+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
+  },
+  "MP_1754230205": {
+    "prediction_id": "MP_1754230205",
+    "ticker": "MP",
+    "prediction_time": "2025-08-03T10:10:05.189511",
+    "current_price": 63.689998626708984,
+    "overall_direction": "down",
+    "overall_confidence": 0.29608491357401395,
+    "signals": [],
+    "detailed_predictions": {
+      "target_direction_3d": {
+        "prediction": 0,
+        "probability": 0.3020395537718187,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.26669210577696245,
+          "random_forest": 0.33738700176667485
+        }
+      },
+      "target_direction_5d": {
+        "prediction": 0,
+        "probability": 0.2901302733762092,
+        "individual_predictions": {
+          "logistic_regression": 0,
+          "random_forest": 0
+        },
+        "individual_probabilities": {
+          "logistic_regression": 0.23775364121835063,
+          "random_forest": 0.34250690553406776
+        }
+      }
+    },
+    "sentiment_data": {
+      "sentiment": "neutral",
+      "confidence": 0.208,
+      "numerical_score": 0.039
+    },
+    "created_at": "2025-08-03T14:10:05.189536+00:00",
+    "model_version": "v2.0",
+    "status": "pending"
   }
 }
