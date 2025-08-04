@@ -116,9 +116,15 @@ def validate_config():
         'REDDIT_CLIENT_ID',
         'REDDIT_CLIENT_SECRET',
         'REDDIT_USER_AGENT',
-        'FIREBASE_PROJECT_ID',
-        'OPENAI_API_KEY'
+        'FIREBASE_PROJECT_ID'
     ]
+
+    # Check provider-specific requirements
+    provider = LLM_CONFIG.get('default_provider', 'xai')
+    if provider == 'xai':
+        required_vars.append('XAI_API_KEY')
+    else:
+        required_vars.append('OPENAI_API_KEY')
 
     missing_vars = [var for var in required_vars if not get_secret(var)]
 
